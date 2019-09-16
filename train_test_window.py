@@ -16,7 +16,7 @@ Params = {
         'batchsize': 32,
         'epochs': 200,
         'lr': 1e-4,
-        'cut_off freq': 0.05,
+        'cut_off freq': 0.1,
         'trunc rate': 0.5
         }
 
@@ -28,10 +28,12 @@ Load data
 #Ytrain = np.load(r'../MI_train_D1_label.npy')
 #Ytest = np.load(r'../MI_test_D1_label.npy')
 #
-Xtrain = np.load(r'../Xtrain.npy')
-Xtest = np.load(r'../Xtest.npy')
-Ytrain = np.load(r'../Ytrain1.npy')
-Ytest = np.load(r'../Ytest1.npy')
+dataset = 'D:/EEG/archive/BCI-IV-dataset3/'
+subject = 1
+Xtrain = np.load(dataset+r'S{}train.npy'.format(subject))
+Xtest = np.load(dataset+r'S{}test.npy'.format(subject))
+Ytrain = np.load(dataset+r'Ytrain.npy'.format(subject))
+Ytest = np.load(dataset+r'S{}Ytest.npy'.format(subject))[0]
 '''
 Normalize data
 '''
@@ -69,14 +71,14 @@ from keras.optimizers import Adam
 
 win_net = locnet_window(Samples = Params['t-length'], 
                         Chans= Params['feature dim'], 
-                        kernLength =5, norm_rate= 0.25)
+                        kernLength = 15, norm_rate= 0.25)
 
 win_net.name = "Window"
 
 cl_net = My_eeg_net_1d(Params['n classes'], Chans = Params['feature dim'], 
                   Samples = Params['win len'], 
-                  dropoutRate = 0.1, kernLength = 50, F1 = 16, 
-                  D = 2, F2 = 32, norm_rate = 0.25, 
+                  dropoutRate = 0.1, kernLength = 50, F1 = 32, 
+                  D = 2, F2 = 64, norm_rate = 0.25, 
                   optimizer = Adam,
                   learning_rate=Params['lr'],
                   dropoutType = 'Dropout')

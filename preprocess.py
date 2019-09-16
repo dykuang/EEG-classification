@@ -259,6 +259,36 @@ def power_spectrum_batch(X, freq=60):
     
     return Ps**0.5
 
+
+def band_decompose(X, fs=400, bands={'Delta': (0, 4),
+                                     'Theta': (4, 8),
+                                     'Alpha': (8, 12),
+                                     'Beta': (12, 30),
+                                     'Gamma': (30, 45)}):
+    '''
+    extract relative band energy from signal `X` according to `bands`
+    X: (batchsize, samples, channels)
+    fs: sampling frequency
+    bands: a dict of frequecy bands
+    '''
+    # Get real amplitudes of FFT (only in postive frequencies)
+    fft_vals = np.absolute(np.fft.rfft(X, axis = 1))
+    
+    total_energy = np.sum(fft_vals**2, axis=1)
+    # Get frequencies for amplitudes in Hz
+    fft_freq = np.fft.rfftfreq(X.shape[1], 1.0/fs)
+    band_power = []
+    for band in bands:  
+        freq_ix = np.where((fft_freq >= bands[band][0]) & 
+                           (fft_freq <= bands[band][1]))[0]
+        
+#        band_power.append(np.median(fft_vals[:,freq_ix,:], axis = 1)) # what metric to use here?
+        band_power.append(np.sum(fft_vals[:,freq_ix,:]**2, axis = 1)/total_energy)
+    
+    return np.stack(band_power, axis=1) # normalize?
+
+
+
 '''
 Convert time series from numpy format to pandas dataframe suitable for tsfresh
 '''

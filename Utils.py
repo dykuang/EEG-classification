@@ -57,6 +57,32 @@ def generator(X, Y, batchsize, shift_limit = 5):
 #            yield [X_gen, Y_gen] 
         
         yield [ X_gen, Y_gen.toarray() ] # sparse OH matrix causing errors in keras fit. set input(sparse = True) does not seem to solve it.
+
+
+def generator_freq(X, Y, batchsize, bandwidth = 30, dist_to_end = 50):
+    '''
+    augment input with cropped frequency 
+    '''  
+    
+    X_gen = np.empty([batchsize] + list(X.shape[1:]))
+    Y_gen = np.empty([batchsize] + list(Y.shape[1:]))
+    n_samples = X.shape[0]
+    while True:
+        prob = np.random.choice(10, 1)
+        start = int(np.random.choice(X.shape[1]//2 - dist_to_end, 1))
+        end = start + bandwidth
+        ind = np.random.choice(n_samples, batchsize, replace=False)
+        X_gen = X[ind]
+        Y_gen = Y[ind]
+        
+        if prob < 5:
+            X_fft = np.fft.rfft(X_gen, axis=1)
+            X_fft[:, start:end, :] = 0              
+            X_gen = np.fft.irfft(X_fft, axis=1)                             
+        
+        yield [ X_gen, Y_gen.toarray()]
+
+
         
 ## Train with custom Train_on_batch method, did not test it, may be slow
 def train(model, X, Y, num_steps, batchsize, check_point=100):

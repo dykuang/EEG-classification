@@ -10,7 +10,7 @@ Some extra modules to be imported in architectures
 
 from keras.layers.core import Layer
 import tensorflow as tf
-import tensorflow_probability as tfp
+#import tensorflow_probability as tfp
 
 class Resample(Layer):
     '''
@@ -451,96 +451,39 @@ class mask(Layer):
     def call(self, X): 
         assert isinstance(X, list)
         signal, attention = X
-        cond = tf.greater(signal, tf.ones(tf.shape(signal))*self.thres)
-        mask = tf.where(cond, tf.ones(tf.shape(signal)), tf.zeros(tf.shape(signal)))
+        cond = tf.greater(attention, tf.ones(tf.shape(attention))*self.thres)
+        mask = tf.where(cond, tf.ones(tf.shape(attention)), tf.zeros(tf.shape(attention)))
         
         return tf.multiply(signal, mask)
 #        return mask
-
-class Resample_under_test(Layer):
+        
+class band_mask(Layer):
     '''
-    This one did not work...
+    Select frequencies from input with "learned" mask
     '''
-
-    def __init__(self,
-                 localization_net, # this suppose to produce a deformation with 3 channels
-                 output_size,
-                 **kwargs):
-        self.locnet = localization_net
-        self.output_size = output_size
-        super(Resample, self).__init__(**kwargs)
+    def __init__(self, thres, **kwargs):
+        
+        self.thres = thres
+        super(band_mask, self).__init__(**kwargs)
 
     def build(self, input_shape):
-        self.locnet.build(input_shape)
-        self.trainable_weights = self.locnet.trainable_weights
-        super(Resample, self).build(input_shape)
+
+        super(band_mask, self).build(input_shape)
 
     def compute_output_shape(self, input_shape):
-        output_size = self.output_size
-        return (None,
-                int(output_size[0]), # length
-                int(output_size[1]) # channels
-                )  
+        assert isinstance(input_shape, list)
+        shape_a, shape_b = input_shape
+        return shape_a
 
     def call(self, X): 
-        displacement = self.locnet.call(X)
-        output = self._transform(displacement, X, self.output_size) 
-        return output
-
-#    def _repeat(self, x, num_repeats): # copy along the second dimension, each row is a copy of an index
-#        '''
-#        tensorflow version of np.repeat
-#        '''
-#        
-#        ones = tf.ones((1, num_repeats), dtype='int32')
-#        x = tf.reshape(x, shape=(-1,1))
-#        x = tf.matmul(x, ones)
-#        return tf.reshape(x, [-1])
-
-#    def _meshgrid(self, length):
-#        
-#        x_linspace = tf.linspace(0.0, length-1, length)
-#        
-#                                 
-#        return x_linspace
-
-    def _transform(self, displacement, input_sig, output_size):
-        batch_size = tf.shape(input_sig)[0]
-        sig_length = tf.shape(input_sig)[1]
-        out_length = output_size[0]
-        num_channels = tf.shape(input_sig)[2]  
+        assert isinstance(X, list)
+        signal, attention = X
+        cond = tf.greater(attention, tf.ones(tf.shape(attention))*self.thres)
+        mask = tf.where(cond, tf.ones(tf.shape(attention)), tf.zeros(tf.shape(attention)))
         
-        num_tracks = batch_size*num_channels
-               
-        sig_length = tf.cast(sig_length, dtype='float32')
-        indices_grid = tf.linspace(0.0, sig_length - 1, out_length)
-        indices_grid = tf.tile(indices_grid, [num_tracks])
-        indices_grid = tf.reshape(indices_grid, [num_tracks, -1])
-            
-        displacement = tf.transpose(displacement, (0,2,1))  # since using channel_last
-        displacement = tf.reshape(displacement, [num_tracks, -1])
-        
-
-#        transformed_grid = indices_grid
-
-        transformed_grid = indices_grid +  displacement # Watch out between the shape
-        
-        y = tf.transpose(input_sig, (0,2,1))
-        y = tf.reshape(y, [num_tracks, -1] )
+        signal_fft = tf.signal.rfft(tf.transpose(tf.cast(signal, 'float32'), (0,2,1)))
+        signal_fft_masked = tf.multiply(signal_fft, tf.transpose(tf.cast(mask,'complex64'), (0,2,1)) ) 
+        signal_rec = tf.signal.irfft(signal_fft_masked)
         
         
-        fn = lambda x: tfp.math.interp_regular_1d_grid(x[0], # modify so it only transform the first channel?
-                                                     x_ref_min = 0.0,
-                                                     x_ref_max = sig_length - 1.0,
-                                                     y_ref = x[1])
-                        
-            
-        
-        transformed_sig = tf.map_fn(fn, [transformed_grid, y]) #ValueError: The two structures don't have the same nested structure.
-                                
-            
-        transformed_sig = tf.stack(transformed_sig, axis=0)
-        transformed_sig = tf.reshape(transformed_sig, (batch_size, num_channels, -1))
-        transformed_sig = tf.transpose(transformed_sig, (0,2,1))
-        
-        return transformed_sig 
+        return tf.transpose(signal_rec, (0, 2, 1))   

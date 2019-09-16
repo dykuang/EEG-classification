@@ -16,269 +16,6 @@ from keras.constraints import max_norm
 
 # model
 
-def TC_arc_sep(time_steps, num_channels, num_classes, num_down=None, optimizer=Adam, learning_rate=1e-3):
-    '''
-    Temporal convolutional blocks + MLP block
-    '''
-    
-    x_in = Input(shape=(time_steps, num_channels))
-    
-    
-    x1 = Conv1D(16, kernel_size=30, strides = 1, padding='same',use_bias = False)(x_in)
-    x2 = Conv1D(16, kernel_size=13, strides = 1, padding='same',use_bias = False)(x_in)
-    x3 = Conv1D(16, kernel_size=3, strides = 1, padding='same',use_bias = False)(x_in)
-    x4 = Conv1D(16, kernel_size=7, strides = 1, padding='same',use_bias = False)(x_in)
-    x = concatenate([x1,x2,x3,x4], axis=-1)
-    x = LeakyReLU(name='LR_1')(x)   
-        
-    x = SeparableConv1D(32, kernel_size=3, strides = 4,depth_multiplier=1,use_bias = False)(x)
-    x = LeakyReLU(name='LR_2')(x)
-    x = SpatialDropout1D(0.25)(x)
-    
-    x = SeparableConv1D(32, kernel_size=3, strides = 1,depth_multiplier=1,use_bias = False)(x)
-    x = LeakyReLU(name='LR_3')(x)
-    x = SeparableConv1D(32, kernel_size=3, strides = 4,depth_multiplier=1,use_bias = False)(x)
-    x = LeakyReLU(name='LR_4')(x)
-    x = SpatialDropout1D(0.25)(x)
-#    x = My_LSTM(x, 32, 1, 32, inter_dim_list=None)
-    
-    if num_down is not None:
-        for i in range(num_down):
-                x = SeparableConv1D(32, kernel_size=3, strides = 1,depth_multiplier=1,use_bias = False)(x)
-                x = LeakyReLU()(x)
-                x = SeparableConv1D(32, kernel_size=3, strides = 2,depth_multiplier=1,use_bias = False)(x)
-                x = LeakyReLU()(x)
-    
-    
-    x = Flatten()(x)
-    x = Dense(64, activation = 'relu', name = 'dense_1', kernel_constraint = max_norm(1.0))(x)
-    #x = BatchNormalization()(x)
-    x = Dropout(0.25)(x)
-    x = Dense(16, activation = 'relu', name = 'dense',kernel_constraint = max_norm(0.5))(x)
-    #x = BatchNormalization()(x)
-    x = Dropout(0.25)(x)
-    x_out = Dense(num_classes, activation = 'softmax', name = 'output')(x)
-    
-    Mymodel = Model(x_in, x_out)
-    
-    Mymodel.compile(loss='categorical_crossentropy', 
-                    metrics=['accuracy'],
-                    optimizer=optimizer(lr=learning_rate))
-    
-    return Mymodel
-
-def TC_arc_1(time_steps, num_channels, num_classes, 
-             num_down=None, optimizer=Adam, learning_rate=1e-3):
-    '''
-    A depthwise conv version of arc_1
-    '''
-    
-    x_in = Input(shape=(time_steps, num_channels))
-    
-    
-    x1 = Conv1D(16, kernel_size=30, strides = 1, padding='same',use_bias = False)(x_in)
-    x2 = Conv1D(16, kernel_size=13, strides = 1, padding='same',use_bias = False)(x_in)
-    x3 = Conv1D(16, kernel_size=3, strides = 1, padding='same',use_bias = False)(x_in)
-    x4 = Conv1D(16, kernel_size=7, strides = 1, padding='same',use_bias = False)(x_in)
-    x = concatenate([x1,x2,x3,x4], axis=-1)
-    x = LeakyReLU(name='LR_1')(x)   
-        
-    x = Conv1D(32, kernel_size=3, strides = 2,use_bias = False)(x)
-    x = LeakyReLU(name='LR_2')(x)
-      
-    x = Conv1D(32, kernel_size=3, strides = 1,use_bias = False)(x)
-    x = LeakyReLU(name='LR_3')(x)
-    x = Conv1D(32, kernel_size=3, strides = 2,use_bias = False)(x)
-    x = LeakyReLU(name='LR_4')(x)
-    
-#    x = My_LSTM(x, 32, 1, 32, inter_dim_list=None)
-    
-    if num_down is not None:
-        for i in range(num_down):
-                x = Conv1D(32, kernel_size=3, strides = 1)(x)
-                x = LeakyReLU()(x)
-                x = Conv1D(32, kernel_size=3, strides = 2)(x)
-                x = LeakyReLU()(x)
-    
-    
-    x = Flatten()(x)
-    x = Dense(64, activation = 'relu', name = 'dense_1', kernel_constraint = max_norm(1.0))(x)
-    #x = BatchNormalization()(x)
-    x = Dropout(0.5)(x)
-    x = Dense(16, activation = 'relu', name = 'dense', kernel_constraint = max_norm(0.5))(x)
-    #x = BatchNormalization()(x)
-    x = Dropout(0.5)(x)
-    x_out = Dense(num_classes, activation = 'softmax', name = 'output')(x)
-    
-    Mymodel = Model(x_in, x_out)
-    
-    Mymodel.compile(loss='categorical_crossentropy', 
-                    metrics=['accuracy'],
-                    optimizer=optimizer(lr=learning_rate))
-    
-    return Mymodel
-
-def TC_arc_2(time_steps, num_channels, num_classes, optimizer=Adam, learning_rate=1e-3):
-    '''
-    A variation from above with one extra input block
-    '''
-    x_in = Input(shape=(time_steps, num_channels))
-       
-    x1 = Conv1D(16, kernel_size=3, strides = 1, padding='same')(x_in)
-    x2 = Conv1D(16, kernel_size=1, strides = 1, padding='same')(x_in)
-    x3 = Conv1D(16, kernel_size=5, strides = 1, padding='same')(x_in)
-    x4 = Conv1D(16, kernel_size=7, strides = 1, padding='same')(x_in)
-    x = concatenate([x1,x2,x3,x4], axis=-1)
-    x = LeakyReLU(name='LR_1')(x)
-    
-    x_in_2 = Input(shape=(time_steps, num_channels))
-    x1_2 = Conv1D(16, kernel_size=3, strides = 1, padding='same')(x_in_2)
-    x2_2 = Conv1D(16, kernel_size=1, strides = 1, padding='same')(x_in_2)
-    x3_2 = Conv1D(16, kernel_size=5, strides = 1, padding='same')(x_in_2)
-    x4_2 = Conv1D(16, kernel_size=7, strides = 1, padding='same')(x_in_2)
-    x_2 = concatenate([x1_2,x2_2,x3_2,x4_2], axis=-1)
-    x_2 = LeakyReLU()(x_2)
-    
-    x = concatenate([x, x_2], axis=-1)
-    
-        
-    x = Conv1D(32, kernel_size=3, strides = 2)(x)
-    x = LeakyReLU(name='LR_2')(x)
-    
-    
-    x = Conv1D(32, kernel_size=3, strides = 1)(x)
-    x = LeakyReLU(name='LR_3')(x)
-    x = Conv1D(32, kernel_size=3, strides = 2)(x)
-    x = LeakyReLU(name='LR_4')(x)
-    
-    
-    x = Flatten()(x)
-    x = Dense(64, activation = 'relu', name = 'relu_1')(x)
-    #x = BatchNormalization()(x)
-    x = Dropout(0.5)(x)
-    x = Dense(16, activation = 'relu', name = 'relu_2')(x)
-    #x = BatchNormalization()(x)
-    x = Dropout(0.5)(x)
-    x_out = Dense(num_classes, activation = 'softmax')(x)
-    
-    Mymodel = Model(x_in, x_out)
-    
-    Mymodel.compile(loss='categorical_crossentropy', 
-                    metrics=['accuracy'],
-                    optimizer=optimizer(lr=learning_rate))
-    
-    return Mymodel
-
-def TC_arc_3(time_steps, num_channels, num_classes, optimizer=Adam, learning_rate=1e-3):
-    '''
-    Try the leaf classification net
-    '''
-    
-    x_in = Input(shape=(time_steps, num_channels))
-    x = Conv1D(filters= 16, kernel_size = 8, strides=4, padding='same', dilation_rate=1, 
-           activation='relu', use_bias=True, kernel_initializer='glorot_uniform',
-           bias_initializer='zeros', kernel_regularizer=None, bias_regularizer=None, 
-           activity_regularizer=None, kernel_constraint=None, bias_constraint=None,
-           name = 'conv1D_1')(x_in)
-    x = BatchNormalization()(x)
-    #x = PReLU()(x)
-    x = MaxPooling1D(pool_size=4, strides=2, name = 'MP_1')(x)
-    x = Flatten(name = 'flat_1')(x)
-    
-    x_x = Conv1D(filters= 24, kernel_size = 12, strides= 6, padding='same', dilation_rate=1, 
-           activation='relu', use_bias=True, kernel_initializer='glorot_uniform',
-           bias_initializer='zeros', kernel_regularizer=None, bias_regularizer=None, 
-           activity_regularizer=None, kernel_constraint=None, bias_constraint=None,
-           name = 'conv1D_2')(x_in)
-    x_x = BatchNormalization()(x_x)
-    #x_x = PReLU()(x_x)
-    x_x = MaxPooling1D(pool_size=4, strides=2, name = 'MP_2')(x_x)
-    x_x = Flatten(name = 'flat_2')(x_x)
-    
-    x_x_x = Conv1D(filters= 32, kernel_size = 16, strides= 8, padding='same', dilation_rate=1, 
-           activation='relu', use_bias=True, kernel_initializer='glorot_uniform',
-           bias_initializer='zeros', kernel_regularizer=None, bias_regularizer=None, 
-           activity_regularizer=None, kernel_constraint=None, bias_constraint=None,
-           name = 'conv1D_3')(x_in)
-    x_x_x = BatchNormalization()(x_x_x)
-
-    x_x_x = MaxPooling1D(pool_size=4, strides=2, name = 'MP_3')(x_x_x)
-    x_x_x = Flatten(name = 'flat_3')(x_x_x)
-
-    feature_f = Flatten(name = 'flat_4')(x_in)
-    #
-    x = concatenate([x, x_x, x_x_x, feature_f])
-    #x = BatchNormalization()(x) 
-    #x = Dropout(0.5)(x)
-    
-    x = Dense(512, activation = 'linear', name = 'dense_1')(x)
-    x = BatchNormalization()(x)
-    x = PReLU()(x)
-    #x = Dropout(0.5)(x)
-    
-    x = Dense(128, activation = 'linear', name = 'dense_2')(x) #increase the dimension here for better speration in stage2 ?
-    x = BatchNormalization()(x)
-    x = PReLU()(x)
-    x = Dropout(0.5)(x)
-    
-    
-    pred = Dense(num_classes, activation = 'softmax', name = 'dense_3')(x)
-    
-    Mymodel = Model(x_in, pred)
-    
-    Mymodel.compile(loss='categorical_crossentropy', 
-                    metrics=['accuracy'],
-                    optimizer=optimizer(lr=learning_rate))
-    
-    return Mymodel
-
-
-def TC_arc_4(time_steps, num_channels, num_classes, optimizer=Adam, learning_rate=1e-3):
-    '''
-    Temporal convolutional blocks (deep) + MLP block
-    '''
-    
-    x_in = Input(shape=(time_steps, num_channels))
-    
-    
-    x1 = Conv1D(16, kernel_size=30, strides = 1, padding='same')(x_in)
-    x2 = Conv1D(16, kernel_size=11, strides = 1, padding='same')(x_in)
-    x3 = Conv1D(16, kernel_size=5, strides = 1, padding='same')(x_in)
-    x4 = Conv1D(16, kernel_size=7, strides = 1, padding='same')(x_in)
-    x = concatenate([x1,x2,x3,x4], axis=-1)
-    x = LeakyReLU(name='LR_1')(x)   
-        
-    x = Conv1D(32, kernel_size=3, strides = 2)(x)
-    x = LeakyReLU(name='LR_2')(x)
-      
-    x = Conv1D(32, kernel_size=3, strides = 1)(x)
-    x = LeakyReLU(name='LR_3')(x)
-    x = Conv1D(32, kernel_size=3, strides = 2)(x)
-    x = LeakyReLU(name='LR_4')(x)
-    
-    for _ in range(7):
-            x_b = Conv1D(32, kernel_size=3, strides = 1, padding='same')(x)
-            x_b = LeakyReLU()(x_b)
-            x = add([x_b, x])
-            x = BatchNormalization()(x)
-        
-    x = Flatten()(x)
-    x = Dense(64, activation = 'relu', name = 'dense_1')(x)
-    #x = BatchNormalization()(x)
-    x = Dropout(0.5)(x)
-    x = Dense(16, activation = 'relu', name = 'dense_2')(x)
-    #x = BatchNormalization()(x)
-    x = Dropout(0.5)(x)
-    x_out = Dense(num_classes, activation = 'softmax', name = 'output')(x)
-    
-    Mymodel = Model(x_in, x_out)
-    
-    Mymodel.compile(loss='categorical_crossentropy', 
-                    metrics=['accuracy'],
-                    optimizer=optimizer(lr=learning_rate, decay=1e-3))
-    
-    return Mymodel
-
 '''
 Define a LSTM block
 '''
@@ -393,7 +130,8 @@ def My_eeg_net_1d(nb_classes, Chans = 64, Samples = 128,
                                    padding = 'same')(block1)
     block1       = BatchNormalization()(block1)
     block1       = Activation('elu')(block1)
-    block1       = AveragePooling1D(8)(block1)
+#    block1       = AveragePooling1D(8)(block1)
+    block1       = MaxPooling1D(8)(block1)
     block1       = dropoutType(dropoutRate)(block1)
     
     block2       = SeparableConv1D(F2, 8,
@@ -401,6 +139,7 @@ def My_eeg_net_1d(nb_classes, Chans = 64, Samples = 128,
     block2       = BatchNormalization()(block2)
     block2       = Activation('elu')(block2)
     block2       = AveragePooling1D(4)(block2)
+#    block2       = MaxPooling1D(4)(block2)
     block2       = dropoutType(dropoutRate)(block2)
     
 #    block2       = SeparableConv1D(F2, 5,
@@ -526,7 +265,7 @@ def loc_Unet(Samples, Chans, kernLength, output_channels = 1, pooling = None, ac
 
 
 
-def My_eeg_net_1d_plus(Sampler, Classifier, t_length, Chans, optimizer, loss_weights, share=False, pooling=1):
+def My_eeg_net_1d_resample(Sampler, Classifier, t_length, Chans, optimizer, loss_weights, share=False, pooling=1):
     
     
     _input   = Input(shape = (t_length, Chans))   
@@ -596,7 +335,8 @@ def My_eeg_net_pt_attd(Sampler, Classifier, t_length, Chans, optimizer, loss_wei
     
     return Mymodel
 
-from modules import mask
+from modules import mask, band_mask
+from keras.layers import ZeroPadding1D
 def My_eeg_net_pt_attd_2(Sampler, Classifier, t_length, Chans, optimizer, loss_weights, thres = 0.5):
     
     
@@ -609,7 +349,42 @@ def My_eeg_net_pt_attd_2(Sampler, Classifier, t_length, Chans, optimizer, loss_w
     att = Sampler(_input)
     
     signal_attention = mask(thres=0.5)([_input, att])
+
     
+    '''
+    connect to the rest classification part
+    '''    
+    pred = Classifier(signal_attention) # a second layer and then weighted sum?
+    
+
+    
+    Mymodel = Model(_input, [pred, att], name='Whole_Model')
+    Mymodel.layers[-1].name = 'Classifier'
+    Mymodel.layers[1].name = 'Attention'
+    
+    
+    Mymodel.compile(loss=['categorical_crossentropy', 'mse'], 
+                    loss_weights = loss_weights,
+                    metrics=['accuracy'],
+                    optimizer=optimizer)
+    
+    return Mymodel
+
+def My_eeg_net_freq_selection(Sampler, Classifier, t_length, Chans, optimizer, loss_weights, thres = 0.5):
+    
+    
+    _input   = Input(shape = (t_length, Chans))   
+    
+    
+    '''
+    resample
+    '''
+    att = Sampler(_input)
+    
+#    signal_attention = mask(thres=0.5)([_input, att])
+    att = ZeroPadding1D((0,1))(att)
+    signal_attention = band_mask(thres)([_input, att])
+#    print(signal_attention.shape)
     
     '''
     connect to the rest classification part

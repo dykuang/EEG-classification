@@ -37,10 +37,20 @@ Load data
 #Xtrain = np.load(r'../fc_train.npy')
 #Xtest = np.load(r'../fc_test.npy')
 #
-Xtrain = np.load(r'../Xtrain.npy')
-Xtest = np.load(r'../Xtest.npy')
-Ytrain = np.load(r'../Ytrain1.npy')
-Ytest = np.load(r'../Ytest1.npy')
+#Xtrain = np.load(r'../Xtrain.npy')
+#Xtest = np.load(r'../Xtest.npy')
+#Ytrain = np.load(r'../Ytrain1.npy')
+#Ytest = np.load(r'../Ytest1.npy')
+
+dataset = 'D:/EEG/archive/BCI-IV-dataset3/'
+subject = 1
+Xtrain = np.load(dataset+r'S{}train.npy'.format(subject))
+Xtest = np.load(dataset+r'S{}test.npy'.format(subject))
+Ytrain = np.load(dataset+r'Ytrain.npy'.format(subject))
+Ytest = np.load(dataset+r'S{}Ytest.npy'.format(subject))[0]
+
+
+
 '''
 Normalize data
 '''
@@ -65,8 +75,8 @@ X_train_transformed, X_test_transformed, _ = normalize_samples(X_train_transform
 #X_train_transformed = X_train_transformed[:,:,:2]
 #X_test_transformed = X_test_transformed[:,:,:2]
 
-#X_train_transformed = rolling_mean(X_train_transformed, 30)
-#X_test_transformed = rolling_mean(X_test_transformed, 30)
+#X_train_transformed = rolling_max(X_train_transformed, 30)
+#X_test_transformed = rolling_max(X_test_transformed, 30)
 
 Params['samples'], Params['t-length'], Params['feature dim'] = X_train_transformed.shape
 
@@ -150,20 +160,32 @@ lr_schedule = LearningRateScheduler(myschedule)
 Train Model
 '''
 randshift = False
+randfreq = True
+aug = True
+if aug:
+    if randshift:
+        from Utils import generator
+        gen = generator(X_train_transformed, Ytrain_OH, Params['batchsize'], shift_limit = 40)
+        hist = Mymodel.fit_generator(gen, steps_per_epoch=Params['samples']//Params['batchsize'] + 1, 
+                                     epochs=Params['epochs'], 
+                                     verbose=1, callbacks=None, 
+                                     validation_data=(X_test_transformed, Ytest_OH), 
+                                     validation_steps=None, 
+                                     class_weight=None, max_queue_size=10, 
+                                     workers=1, use_multiprocessing=False, shuffle=True)
+    if randfreq:
+        from Utils import generator_freq
+        gen = generator_freq(X_train_transformed, Ytrain_OH, Params['batchsize'], bandwidth = 50, dist_to_end = 100)
+        hist = Mymodel.fit_generator(gen, steps_per_epoch=Params['samples']//Params['batchsize'] + 1, 
+                                     epochs=Params['epochs'], 
+                                     verbose=1, callbacks=None, 
+                                     validation_data=(X_test_transformed, Ytest_OH), 
+                                     validation_steps=None, 
+                                     class_weight=None, max_queue_size=10, 
+                                     workers=1, use_multiprocessing=False, shuffle=True)
 
-if randshift:
-    from Utils import generator
-    gen = generator(X_train_transformed, Ytrain_OH, Params['batchsize'], shift_limit = 40)
-    hist = Mymodel.fit_generator(gen, steps_per_epoch=160//Params['batchsize'] + 1, 
-                                 epochs=Params['epochs'], 
-                                 verbose=1, callbacks=None, 
-                                 validation_data=(X_test_transformed, Ytest_OH), 
-                                 validation_steps=None, 
-                                 class_weight=None, max_queue_size=10, 
-                                 workers=1, use_multiprocessing=False, shuffle=True)
-    
 else:
-    weight_dict = np.array([1.0,10.0,1.0,1.0])
+    weight_dict = np.array([1.0,1.0,1.0,1.0])
     hist = Mymodel.fit(X_train_transformed, Ytrain_OH, 
                 epochs=Params['epochs'], batch_size = Params['batchsize'],
                 validation_data = (X_test_transformed, Ytest_OH),

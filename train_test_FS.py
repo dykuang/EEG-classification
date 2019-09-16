@@ -1,11 +1,10 @@
-#!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
-Created on Wed Aug 28 16:23:27 2019
+Created on Sun Sep  1 15:38:44 2019
 
-@author: dykuang
+@author: dykua
 
-Test script with added modules
+Test the frequency selection module
 """
 
 from keras.optimizers import Adam, SGD
@@ -14,12 +13,10 @@ from sklearn.preprocessing import MinMaxScaler, OneHotEncoder, StandardScaler
 
 Params = {
         'batchsize': 32,
-        'epochs': 200,
+        'epochs': 100,
         'lr': 1e-4,
         'cut_off freq': 0.1,
-        'LW': [1.0, 1e-4],
-        'share': True,
-        'Sub ratio': 2
+        'Attention thres': 0.33
         }
 
 '''
@@ -30,10 +27,12 @@ Load data
 #Ytrain = np.load(r'../MI_train_D1_label.npy')
 #Ytest = np.load(r'../MI_test_D1_label.npy')
 #
-Xtrain = np.load(r'../Xtrain.npy')
-Xtest = np.load(r'../Xtest.npy')
-Ytrain = np.load(r'../Ytrain1.npy')
-Ytest = np.load(r'../Ytest1.npy')
+dataset = 'D:/EEG/archive/BCI-IV-dataset3/'
+subject = 1
+Xtrain = np.load(dataset+r'S{}train.npy'.format(subject))
+Xtest = np.load(dataset+r'S{}test.npy'.format(subject))
+Ytrain = np.load(dataset+r'Ytrain.npy'.format(subject))
+Ytest = np.load(dataset+r'S{}Ytest.npy'.format(subject))[0]
 '''
 Normalize data
 '''
@@ -64,28 +63,26 @@ _, Params['n classes'] = Ytrain_OH.shape
 Build Model
 '''
 
-from architectures import My_eeg_net_1d_plus as eeg_net
+from architectures import My_eeg_net_freq_selection as eeg_net
 from architectures import My_eeg_net_1d, locnet, loc_Unet
 from keras.optimizers import Adam
 
-if Params['share']:
-    disp_net = locnet(Samples = Params['t-length'], 
+import keras.backend as K
+#def my_activation(x):
+#
+#    return K.switch(x>0.0, )
+
+att_net = loc_Unet(Samples = Params['t-length'], 
                       Chans = Params['feature dim'], 
-                      kernLength = 5,
-                      output_channels = 1,
-                      pooling = Params['Sub ratio'])
-else:
-    disp_net = locnet(Samples = Params['t-length'], 
-                      Chans = Params['feature dim'], 
-                      kernLength = 5,
+                      kernLength = 15,
                       output_channels = Params['feature dim'],
-                      pooling = Params['Sub ratio'])
-    
-disp_net.name = "Resampler"
+                      pooling = 2,
+                      activation = 'sigmoid')   
+att_net.name = "Attention"
 
 cl_net = My_eeg_net_1d(Params['n classes'], Chans = Params['feature dim'], 
-                  Samples = Params['t-length']//Params['Sub ratio'], 
-                  dropoutRate = 0.3, kernLength = 50, F1 = 32, 
+                  Samples = Params['t-length'], 
+                  dropoutRate = 0.2, kernLength = 50, F1 = 32, 
                   D = 2, F2 = 64, norm_rate = 0.25, 
                   optimizer = Adam,
                   learning_rate=Params['lr'],
@@ -93,12 +90,11 @@ cl_net = My_eeg_net_1d(Params['n classes'], Chans = Params['feature dim'],
 cl_net.name = "Classifier"
 
 
-Mymodel = eeg_net(Sampler=disp_net, Classifier=cl_net, 
+Mymodel = eeg_net(Sampler=att_net, Classifier=cl_net, 
                   t_length=Params['t-length'], Chans=Params['feature dim'],
-                  optimizer=Adam(lr=Params['lr']), 
-                  loss_weights = Params['LW'],
-                  share = Params['share'],                  
-                  pooling = Params['Sub ratio'])
+                  optimizer=Adam(lr=Params['lr']), loss_weights=[1.0, 0.001],
+                  thres = Params['Attention thres']
+                  )
 
 Mymodel.summary()
 
@@ -141,9 +137,9 @@ lr_schedule = LearningRateScheduler(myschedule)
 '''
 Train Model
 '''
-hist = Mymodel.fit(X_train_transformed, [Ytrain_OH, np.zeros([Params['samples'], Params['t-length']//Params['Sub ratio'], Params['feature dim']])], 
+hist = Mymodel.fit(X_train_transformed, [Ytrain_OH, np.zeros([Params['samples'], Params['t-length']//2 + 1, Params['feature dim']]) ],  #np.ones ?
             epochs=Params['epochs'], batch_size = Params['batchsize'],
-            validation_data = (X_test_transformed, [Ytest_OH, np.zeros([X_test_transformed.shape[0], X_test_transformed.shape[1]//Params['Sub ratio'], Params['feature dim']])]),
+            validation_data = (X_test_transformed, [Ytest_OH,np.zeros([X_test_transformed.shape[0], Params['t-length']//2 + 1, Params['feature dim']])]),
 #            validation_split=0.2,
             verbose=1,
             callbacks=[])
@@ -155,25 +151,20 @@ Summary statistics
 '''
 print(Params)
 from sklearn.metrics import accuracy_score
-pred_train,_ = Mymodel.predict(X_train_transformed)
+pred_train, _ = Mymodel.predict(X_train_transformed)
 print("Acc on trained data: {}".format(accuracy_score(Ytrain, np.argmax(pred_train, axis=1))))
-pred_test,_ = Mymodel.predict(X_test_transformed)
+pred_test, _ = Mymodel.predict(X_test_transformed)
 print("Acc on test data: {}".format(accuracy_score(Ytest, np.argmax(pred_test, axis=1))))
 
 '''
 For test purpose
 '''
-import keras.backend as K
-re = K.function([Mymodel.input], [Mymodel.layers[-3].output])
+
+re = K.function([Mymodel.input], [Mymodel.layers[-2].output])
 a = re([X_train_transformed])[0]
 
-disp = Mymodel.layers[-3].locnet.predict(X_test_transformed)
-grid = np.linspace(0, Params['t-length']-1, Params['t-length']//Params['Sub ratio'])
-grid = np.tile(grid, Xtest.shape[0]*Xtest.shape[-1])
-grid = np.reshape(grid, (Xtest.shape[0], Xtest.shape[-1], Xtest.shape[1]//Params['Sub ratio']))
-grid = np.transpose(grid, (0, 2, 1))
-moved = grid + disp
-#moved = grid+disp[0,:,0]
+att = Mymodel.layers[1].predict(X_test_transformed)
+
 
 
 import matplotlib.pyplot as plt
@@ -191,15 +182,15 @@ plt.legend(['Train', 'Test'])
 
 plt.figure()
 plt.subplot(2,1,1)
-plt.stem(disp[0,:,0])
+plt.stem(att[0,:,0])
 plt.subplot(2,1,2)
-plt.hist(disp[0,:,0])
+plt.hist(att[0,:,0])
 
 plt.figure()
-plt.plot(np.arange(Params['t-length']), X_train_transformed[0,:,0])
+plt.plot(np.arange(Params['t-length']), X_train_transformed[6,:,0])
 #plt.plot(moved[0,:,0], a[0,:,0])
-plt.plot(np.arange(0, Params['t-length'],Params['Sub ratio']), a[0,:,0])
-plt.legend(['original','resampled'])
+plt.plot(np.arange(0, Params['t-length']), a[6,:,0])
+plt.legend(['original','after attention'])
 
 
 
