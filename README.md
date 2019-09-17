@@ -18,4 +18,4 @@
 `train_test_window.py`: Using the window_trunc module. A second network will predict a starting point. Input signals will be truncated from this point with fixed length before going to the classifier. (Does not compile with current implementation, still working on it.)
 
 ## Current performance  
-[BCI-IV dataset 3](http://www.bbci.de/competition/iv/results/index.html#dataset3):  At leaast 10% of accuracy improvements on both subjects. 
+[BCI-IV dataset 3](http://www.bbci.de/competition/iv/results/index.html#dataset3):  About 10% or more accuracy improvements on both subjects. 
