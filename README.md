@@ -16,3 +16,6 @@
 `train_test_FS.py`: Using the band_mask module. A second network will predict a binary mask in the frequency domain and reconstructs signal to-be-classified using selected frequencies before feeding it to the downstream classifier.  
 `train_test_resample.py`: Using the resample module. A second network will produce a new grid (not uniformed, not necessarily the same resolution) to resample the input with interpolation. The resampled signal will then flow to the classifier.  It has the option to specify whether all channels will share the same grid or using different grids.  
 `train_test_window.py`: Using the window_trunc module. A second network will predict a starting point. Input signals will be truncated from this point with fixed length before going to the classifier. (Does not compile with current implementation, still working on it.)
+
+## Current performance  
+[BCI-IV dataset 3](http://www.bbci.de/competition/iv/results/index.html#dataset3):  At leaast 10% of accuracy improvements on both subjects. 
