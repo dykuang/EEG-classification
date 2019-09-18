@@ -14,10 +14,10 @@ from sklearn.preprocessing import MinMaxScaler, OneHotEncoder, StandardScaler
 
 Params = {
         'batchsize': 32,
-        'epochs': 200,
+        'epochs': 100,
         'lr': 1e-4,
         'cut_off freq': 0.1,
-        'trunc rate': 0.5
+        'trunc rate': 1.0
         }
 
 '''
@@ -159,10 +159,19 @@ import keras.backend as K
 re = K.function([Mymodel.input], [Mymodel.layers[-2].output])
 a = re([X_train_transformed])[0]
 
-start_point = Mymodel.layers[-2].locnet.predict(X_test_transformed)
-start_point_scaled_back = start_point * (Params['t-length']-1)
-start_point_scaled_back = np.floor(start_point_scaled_back)
+#start_point = Mymodel.layers[-2].locnet.predict(X_test_transformed)
+#start_point_scaled_back = start_point * (Params['t-length']-1)
+#start_point_scaled_back = np.floor(start_point_scaled_back)
 
+transformation = Mymodel.layers[-2].locnet.predict(X_train_transformed)
+grid = np.arange(Params['win len'])
+indices_grid = np.stack([grid, np.ones_like(grid)], axis=0)
+indices_grid = np.tile(indices_grid, np.stack([Params['samples']]))
+indices_grid = np.reshape(indices_grid, (Params['samples'], 2, -1) )
+
+transformation = np.reshape(transformation, (-1, 1, 2))
+
+grid_transformed = np.matmul(transformation, indices_grid)
 
 import matplotlib.pyplot as plt
 plt.figure()
@@ -177,12 +186,12 @@ plt.plot(hist.history['val_acc'])
 plt.title('Accuracy')
 plt.legend(['Train', 'Test'])
 
-plt.figure()
-plt.hist(start_point_scaled_back[:,5])
+#plt.figure()
+#plt.hist(start_point_scaled_back[:,5])
 
 plt.figure()
 plt.plot(np.arange(Params['t-length']), X_train_transformed[0,:,0])
-plt.plot(start_point_scaled_back[0,0] + np.arange(Params['win len']), a[0,:,0])
+plt.plot(grid_transformed[0,0,:], a[0,:,0])
 plt.legend(['original','resampled'])
 
 

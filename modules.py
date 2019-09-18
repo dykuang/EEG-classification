@@ -263,6 +263,290 @@ class Resample_multi_channel(Layer):
         
         return transformed_vol     
 
+class STN_1D(Layer):
+    '''
+    1D spatial transformer
+    '''
+
+    def __init__(self,
+                 localization_net, # this suppose to produce a deformation with 3 channels
+                 output_size,
+                 **kwargs):
+        self.locnet = localization_net
+        self.output_size = output_size
+        super(STN_1D, self).__init__(**kwargs)
+
+    def build(self, input_shape):
+        self.locnet.build(input_shape)
+        self.trainable_weights = self.locnet.trainable_weights
+        super(STN_1D, self).build(input_shape)
+
+    def compute_output_shape(self, input_shape):
+        output_size = self.output_size
+        return (None,
+                int(output_size[0]), # time
+                int(output_size[1]), # channels
+                )  
+
+    def call(self, X, mask=None): 
+        deformation = self.locnet.call(X)
+#        Y = tf.expand_dims(X[...,0], 4) # only transform the first channel
+        output = self._transform(deformation, X, self.output_size) 
+        return output
+
+    def _repeat(self, x, num_repeats): # copy along the second dimension, each row is a copy of an index
+        ones = tf.ones((1, num_repeats), dtype='int32')
+        x = tf.reshape(x, shape=(-1,1))
+        x = tf.matmul(x, ones)
+        return tf.reshape(x, [-1])
+
+    def _interpolate(self, signal, x, output_size): 
+
+        batch_size = tf.shape(signal)[0]
+        t_len = tf.shape(signal)[1]
+        num_channels = tf.shape(signal)[-1]
+
+        x = tf.cast(x , dtype='float32')
+
+        x0 = tf.cast(tf.floor(x), 'int32')
+        x1 = x0 + 1
+        
+        max_x = tf.cast(t_len - 1,  dtype='int32')        
+        zero = tf.zeros([], dtype='int32')
+
+        x0 = tf.clip_by_value(x0, zero, max_x)
+        x1 = tf.clip_by_value(x1, zero, max_x)
+
+        pts_batch = tf.range(batch_size)*t_len
+        flat_output_dimensions = output_size[0]
+        base = self._repeat(pts_batch, flat_output_dimensions)
+        
+#        print(base.shape)
+#        print(x0.shape)
+        ind_0 = base + x0
+        ind_1 = base + x1
+
+#        flat_signal = tf.transpose(signal, (0,2,1))
+        flat_signal = tf.reshape(signal, [-1, num_channels] )
+        flat_signal = tf.cast(flat_signal, dtype='float32')
+        
+       
+        pts_values_0 = tf.gather(flat_signal, ind_0)
+        pts_values_1 = tf.gather(flat_signal, ind_1)
+        
+        
+        x0 = tf.cast(x0, 'float32')
+        x1 = tf.cast(x1, 'float32')
+
+        
+        w_0 = tf.expand_dims(x1 - x, 1)
+        w_1 = tf.expand_dims(x - x0, 1)
+
+        output = w_0*pts_values_0 + w_1*pts_values_1
+        
+        output = tf.reshape(output, (-1, output_size[0], output_size[1]))
+          
+     
+        return output
+
+    def _meshgrid(self, t_length):
+        x_linspace = tf.linspace(0., t_length - 1., t_length)
+        ones = tf.ones_like(x_linspace)
+        indices_grid = tf.concat([x_linspace, ones], 0)
+        return indices_grid
+
+    def _transform(self, affine_transformation, input_sig, output_size):
+        batch_size = tf.shape(input_sig)[0]
+        t_len = output_size[0]
+#        num_channels = tf.shape(input_sig)[-1]
+              
+        indices_grid = self._meshgrid(t_len)
+
+        indices_grid = tf.tile(indices_grid, tf.stack([batch_size]))
+        indices_grid = tf.reshape(indices_grid, (batch_size, 2, -1) )
+
+        affine_transformation = tf.reshape(affine_transformation, (-1, 1, 2)) # this line is necessary for tf.matmul to perform
+        affine_transformation = tf.cast(affine_transformation, 'float32')
+        
+#        print(indices_grid.shape)
+#        print(affine_transformation.shape)
+        transformed_grid = tf.matmul(affine_transformation, indices_grid) 
+        
+        x_s_flatten = tf.reshape(transformed_grid, [-1])
+
+        transformed_vol = self._interpolate(input_sig, 
+                                                x_s_flatten,
+                                                output_size)
+
+        
+        return transformed_vol     
+
+class SpatialTransformer(Layer):
+    """Spatial Transformer Layer
+    Implements a spatial transformer layer as described in [1]_.
+    Borrowed from [2]_:
+    References
+    ----------
+    .. [1]  Spatial Transformer Networks
+            Max Jaderberg, Karen Simonyan, Andrew Zisserman, Koray Kavukcuoglu
+            Submitted on 5 Jun 2015
+    .. [2]  https://github.com/skaae/transformer_network/blob/master/transformerlayer.py
+    .. [3]  https://github.com/EderSantana/seya/blob/keras1/seya/layers/attention.py
+    """
+
+    def __init__(self,
+                 localization_net,
+                 output_size,
+                 **kwargs):
+        self.locnet = localization_net
+        self.output_size = output_size
+        super(SpatialTransformer, self).__init__(**kwargs)
+
+    def build(self, input_shape):
+        self.locnet.build(input_shape)
+        self.trainable_weights = self.locnet.trainable_weights
+        super(SpatialTransformer, self).build(input_shape)
+
+    def compute_output_shape(self, input_shape):
+        output_size = self.output_size
+        return (None,
+                int(output_size[0]),
+                int(output_size[1]) )
+#                int(input_shape[-1]))
+
+    def call(self, X, mask=None):
+        affine_transformation = self.locnet.call(X)
+#        Y = tf.expand_dims(X[:,:,:,0], 3)
+        output = self._transform(affine_transformation, X, self.output_size)
+        return output
+
+    def _repeat(self, x, num_repeats):
+        ones = tf.ones((1, num_repeats), dtype='int32')
+        x = tf.reshape(x, shape=(-1,1))
+        x = tf.matmul(x, ones)
+        return tf.reshape(x, [-1])
+
+    def _interpolate(self, image, x, y, output_size):
+        batch_size = tf.shape(image)[0]
+        height = tf.shape(image)[1]
+        width = tf.shape(image)[2]
+#        num_channels = tf.shape(image)[3]
+
+        x = tf.cast(x , dtype='float32')
+        y = tf.cast(y , dtype='float32')
+
+#        height_float = tf.cast(height, dtype='float32')
+#        width_float = tf.cast(width, dtype='float32')
+
+        output_height = output_size[0]
+        output_width  = output_size[1]
+
+#        x = .5*(x + 1.0)*(width_float-1)
+#        y = .5*(y + 1.0)*(height_float-1)
+
+        x0 = tf.cast(tf.floor(x), 'int32')
+        x1 = x0 + 1
+        y0 = tf.cast(tf.floor(y), 'int32')
+        y1 = y0 + 1
+
+        max_y = tf.cast(height - 1, dtype='int32')
+        max_x = tf.cast(width - 1,  dtype='int32')
+        zero = tf.zeros([], dtype='int32')
+
+        x0 = tf.clip_by_value(x0, zero, max_x)
+        x1 = tf.clip_by_value(x1, zero, max_x)
+        y0 = tf.clip_by_value(y0, zero, max_y)
+        y1 = tf.clip_by_value(y1, zero, max_y)
+
+        flat_image_dimensions = width*height
+        pixels_batch = tf.range(batch_size)*flat_image_dimensions
+        flat_output_dimensions = output_height*output_width
+        base = self._repeat(pixels_batch, flat_output_dimensions)
+        base_y0 = base + y0*width
+        base_y1 = base + y1*width
+        indices_a = base_y0 + x0
+        indices_b = base_y1 + x0
+        indices_c = base_y0 + x1
+        indices_d = base_y1 + x1
+
+#        flat_image = tf.reshape(image, shape=(-1, num_channels))
+        flat_image = tf.reshape(image, shape=(-1,1))
+        flat_image = tf.cast(flat_image, dtype='float32')
+        pixel_values_a = tf.gather(flat_image, indices_a)
+        pixel_values_b = tf.gather(flat_image, indices_b)
+        pixel_values_c = tf.gather(flat_image, indices_c)
+        pixel_values_d = tf.gather(flat_image, indices_d)
+
+        x0 = tf.cast(x0, 'float32')
+        x1 = tf.cast(x1, 'float32')
+        y0 = tf.cast(y0, 'float32')
+        y1 = tf.cast(y1, 'float32')
+
+        area_a = tf.expand_dims(((x1 - x) * (y1 - y)), 1)
+        area_b = tf.expand_dims(((x1 - x) * (y - y0)), 1)
+        area_c = tf.expand_dims(((x - x0) * (y1 - y)), 1)
+        area_d = tf.expand_dims(((x - x0) * (y - y0)), 1)
+
+#        area_a = ((x1 - x) * (y1 - y))
+#        area_b = ((x1 - x) * (y - y0))
+#        area_c = ((x - x0) * (y1 - y))
+#        area_d = ((x - x0) * (y - y0))
+        
+        
+        output = tf.add_n([area_a*pixel_values_a,
+                           area_b*pixel_values_b,
+                           area_c*pixel_values_c,
+                           area_d*pixel_values_d])
+        return output
+
+    def _meshgrid(self, height, width):
+        x_linspace = tf.linspace(0., width - 1., width)
+        y_linspace = tf.linspace(0., height- 1., height)
+        x_coordinates, y_coordinates = tf.meshgrid(x_linspace, y_linspace)
+        x_coordinates = tf.reshape(x_coordinates, [-1])
+        y_coordinates = tf.reshape(y_coordinates, [-1])
+        ones = tf.ones_like(x_coordinates)
+        indices_grid = tf.concat([x_coordinates, y_coordinates, ones], 0)
+        return indices_grid
+
+    def _transform(self, affine_transformation, input_shape, output_size):
+        batch_size = tf.shape(input_shape)[0]
+        height = tf.shape(input_shape)[1]
+        width = tf.shape(input_shape)[2]
+#        num_channels = tf.shape(input_shape)[-1]
+
+#        affine_transformation = tf.reshape(affine_transformation, shape=(batch_size,2,3))
+
+        affine_transformation = tf.reshape(affine_transformation, (-1, 2, 3))
+        affine_transformation = tf.cast(affine_transformation, 'float32')
+
+        width = tf.cast(width, dtype='float32')
+        height = tf.cast(height, dtype='float32')
+        output_height = output_size[0]
+        output_width = output_size[1]
+        indices_grid = self._meshgrid(output_height, output_width)
+#        indices_grid = tf.expand_dims(indices_grid, 0)
+#        indices_grid = tf.reshape(indices_grid, [-1]) # flatten?
+
+        indices_grid = tf.tile(indices_grid, tf.stack([batch_size]))
+        indices_grid = tf.reshape(indices_grid, (batch_size, 3, -1))
+
+        transformed_grid = tf.matmul(affine_transformation, indices_grid)
+        x_s = tf.slice(transformed_grid, [0, 0, 0], [-1, 1, -1])
+        y_s = tf.slice(transformed_grid, [0, 1, 0], [-1, 1, -1])
+        x_s_flatten = tf.reshape(x_s, [-1])
+        y_s_flatten = tf.reshape(y_s, [-1])
+
+        transformed_image = self._interpolate(input_shape,
+                                                x_s_flatten,
+                                                y_s_flatten,
+                                                output_size)
+
+        transformed_image = tf.reshape(transformed_image, shape=(batch_size,
+                                                                output_height,
+                                                                output_width)
+                                                                    )
+        return transformed_image
 
 class Window_trunc_no_weights(Layer):
     '''
@@ -346,8 +630,7 @@ class Window_trunc_no_weights(Layer):
         
         values = tf.transpose(values, (0, 2, 1))
 
-        return values
-    
+        return values    
 
     
 class Window_trunc(Layer):
@@ -364,7 +647,7 @@ class Window_trunc(Layer):
 
     def build(self, input_shape):
         self.locnet.build(input_shape)
-#        self.trainable_weights = self.locnet.trainable_weights  # returns non-gradient error..
+        self.trainable_weights = self.locnet.trainable_weights  # returns non-gradient error..
         super(Window_trunc, self).build(input_shape)
 
     def compute_output_shape(self, input_shape):
@@ -399,23 +682,29 @@ class Window_trunc(Layer):
         batch_Cs = batchsize*num_channels
 #        batch_Cs_float = tf.cast(batch_Cs, 'float32')
         grid = tf.tile( tf.range(out_len), [batch_Cs])
-        
+
         max_t = t_len - out_len - 1       
         zero = tf.zeros([], dtype='int32')
         
         t_len_float = tf.cast(t_len, 'float32')
-        start_pts_scaled_back = tf.floor(start_pts * (t_len_float - 1) )
+        start_pts_scaled_back = tf.floor(start_pts * (t_len_float - 1.0) )
         start_pts_flat = tf.reshape(start_pts_scaled_back, [-1]) # if start_pts is between 0 and 1, i.e. sigmoid activation
 #        start_pts_flat = tf.reshape(tf.floor(start_pts), [-1]) # if activation is relu in locnet's last layer
         
-        start_pts_flat = tf.cast(start_pts_flat, 'int32')
-        start_pts_flat = tf.clip_by_value(start_pts_flat, zero, max_t) # value clip here
-        S_pts = self.repeat(start_pts_flat, out_len)
+#        start_pts_flat = tf.cast(start_pts_flat, 'int32')
+#        start_pts_flat = tf.clip_by_value(start_pts_flat, zero, max_t) # value clip here
+#        S_pts = self.repeat(start_pts_flat, out_len) # this block may be the problem                
         
         base = self.repeat(tf.range(batch_Cs)*t_len, out_len)
+
+#        indices = tf.add_n([grid , S_pts , base])
         
-        indices = tf.add_n([grid , S_pts , base])
-#        indices = grid + base
+        St = tf.transpose( tf.reshape(grid, (batch_Cs, out_len)), (1, 0) ) + start_pts_flat
+        
+        S_pts = tf. reshape( tf.transpose(St, (1, 0)), [-1])
+        
+        indices = S_pts + base
+
         ################################################################
         
         signal_flat = tf.transpose(signal, (0, 2, 1))
@@ -428,6 +717,8 @@ class Window_trunc(Layer):
         values = tf.transpose(values, (0, 2, 1))
         
         return values
+    
+
 
 class mask(Layer):
     '''

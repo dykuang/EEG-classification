@@ -405,7 +405,7 @@ def My_eeg_net_freq_selection(Sampler, Classifier, t_length, Chans, optimizer, l
     
     return Mymodel
 
-from modules import Window_trunc, Window_trunc_no_weights
+from modules import Window_trunc, Window_trunc_no_weights, SpatialTransformer, STN_1D
 def locnet_window(Samples, Chans, kernLength, norm_rate= 0.25):
     '''
     Take the input signal and outputs the starting points of truncated windows
@@ -443,9 +443,9 @@ def locnet_window(Samples, Chans, kernLength, norm_rate= 0.25):
     flatten        = SeparableConv1D(1, 1, use_bias = True, padding = 'valid')(down_3)
     flatten        = Flatten()(flatten)
                                    
-    out            = Dense(Chans, name = 'dense', 
-                         kernel_constraint = max_norm(norm_rate))(flatten)
-    out            = Activation('sigmoid', name = 'sigmoid')(out)
+    out            = Dense(2, name = 'dense')(flatten)
+#                         kernel_constraint = max_norm(norm_rate))(flatten)
+#    out            = Activation('sigmoid', name = 'sigmoid')(out)
     
     return Model(input1, out, name='Window')
 
@@ -459,7 +459,11 @@ def My_eeg_net_window(Window, Classifier, t_length, window_len, Chans, optimizer
     '''
     Truncate the singal
     '''
-    windowed_signal = Window_trunc(localization_net = Window, 
+#    windowed_signal = Window_trunc(localization_net = Window, 
+#                                output_size=(window_len, Chans))(_input)
+#    windowed_signal = SpatialTransformer(localization_net = Window, 
+#                                output_size=(window_len, Chans))(_input)
+    windowed_signal = STN_1D(localization_net = Window, 
                                 output_size=(window_len, Chans))(_input)
     
 #    proposed_starts  = Window(_input)
