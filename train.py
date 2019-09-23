@@ -20,7 +20,7 @@ from sklearn.preprocessing import MinMaxScaler, OneHotEncoder, StandardScaler
 
 Params = {
         'batchsize': 32,
-        'epochs': 100,
+        'epochs': 50,
         'lr': 1e-4,
         'cut_off freq': 0.1,
         'num downsampling': None
@@ -115,7 +115,7 @@ else:
 
 Mymodel = eeg_net(Params['n classes'], Chans = Params['feature dim'], 
                       Samples = Params['t-length'], 
-                      dropoutRate = 0.3, kernLength = 50, F1 = 32, 
+                      dropoutRate = 0.2, kernLength = 50, F1 = 32, 
                       D = 2, F2 = 64, norm_rate = 0.25, 
                       optimizer = Adam,
                       learning_rate=Params['lr'],

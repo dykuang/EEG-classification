@@ -263,23 +263,24 @@ class Resample_multi_channel(Layer):
         
         return transformed_vol     
 
-class STN_1D(Layer):
+class STN_1D_noweights_multi_channel(Layer):
     '''
-    1D spatial transformer
+    1D spatial transformer,
+    Each channel has its own transformation
     '''
 
     def __init__(self,
-                 localization_net, # this suppose to produce a deformation with 3 channels
+#                 localization_net, # this suppose to produce a deformation with 3 channels
                  output_size,
                  **kwargs):
-        self.locnet = localization_net
+#        self.locnet = localization_net
         self.output_size = output_size
-        super(STN_1D, self).__init__(**kwargs)
+        super(STN_1D_noweights_multi_channel, self).__init__(**kwargs)
 
     def build(self, input_shape):
-        self.locnet.build(input_shape)
-        self.trainable_weights = self.locnet.trainable_weights
-        super(STN_1D, self).build(input_shape)
+#        self.locnet.build(input_shape)
+#        self.trainable_weights = self.locnet.trainable_weights
+        super(STN_1D_noweights_multi_channel, self).build(input_shape)
 
     def compute_output_shape(self, input_shape):
         output_size = self.output_size
@@ -289,9 +290,10 @@ class STN_1D(Layer):
                 )  
 
     def call(self, X, mask=None): 
-        deformation = self.locnet.call(X)
+        transformation, sig = X
+#        deformation = self.locnet.call(X)
 #        Y = tf.expand_dims(X[...,0], 4) # only transform the first channel
-        output = self._transform(deformation, X, self.output_size) 
+        output = self._transform(transformation, sig, self.output_size) 
         return output
 
     def _repeat(self, x, num_repeats): # copy along the second dimension, each row is a copy of an index
@@ -303,10 +305,150 @@ class STN_1D(Layer):
     def _interpolate(self, signal, x, output_size): 
 
         batch_size = tf.shape(signal)[0]
+#        print(tf.keras.backend.int_shape(signal))
         t_len = tf.shape(signal)[1]
         num_channels = tf.shape(signal)[-1]
 
         x = tf.cast(x , dtype='float32')
+        scale = tf.cast(output_size[0], dtype='float32')
+        
+        x = x * scale
+
+        x0 = tf.cast(tf.floor(x), 'int32')
+        x1 = x0 + 1
+        
+        max_x = tf.cast(t_len - 1,  dtype='int32')        
+        zero = tf.zeros([], dtype='int32')
+
+        x0 = tf.clip_by_value(x0, zero, max_x)
+        x1 = tf.clip_by_value(x1, zero, max_x)
+
+        pts_batch = tf.range(batch_size*num_channels)*t_len
+        flat_output_dimensions = output_size[0]
+        base = self._repeat(pts_batch, flat_output_dimensions)
+        
+#        print(base.shape)
+#        print(x0.shape)
+        ind_0 = base + x0
+        ind_1 = base + x1
+
+        flat_signal = tf.transpose(signal, (0,2,1))
+        flat_signal = tf.reshape(flat_signal, [-1] )
+
+#        flat_signal = tf.reshape(signal, [-1, num_channels] )
+        flat_signal = tf.cast(flat_signal, dtype='float32')
+        
+       
+        pts_values_0 = tf.gather(flat_signal, ind_0)
+        pts_values_1 = tf.gather(flat_signal, ind_1)
+        
+        
+        x0 = tf.cast(x0, 'float32')
+        x1 = tf.cast(x1, 'float32')
+
+        w_0 = x1 - x
+        w_1 = x - x0
+#        w_0 = tf.expand_dims(x1 - x, 1)
+#        w_1 = tf.expand_dims(x - x0, 1)
+
+        output = w_0*pts_values_0 + w_1*pts_values_1
+        
+        output = tf.reshape(output, (-1, output_size[1], output_size[0]))
+          
+        output = tf.transpose(output, (0,2,1))
+        
+        return output
+
+    def _meshgrid(self, t_length):
+        x_linspace = tf.linspace(0., 1.0, t_length)
+        ones = tf.ones_like(x_linspace)
+        indices_grid = tf.concat([x_linspace, ones], axis=0)
+#        return tf.reshape(indices_grid, [-1])
+        return indices_grid
+
+    def _transform(self, affine_transformation, input_sig, output_size):
+        batch_size = tf.shape(input_sig)[0]
+        t_len = output_size[0]
+        num_channels = tf.shape(input_sig)[-1]
+              
+        indices_grid = self._meshgrid(t_len)
+
+
+        indices_grid = tf.tile(indices_grid, tf.stack([batch_size*num_channels]))
+        indices_grid = tf.reshape(indices_grid, (batch_size, num_channels, 2, -1) )
+#
+#        indices_grid = tf.tile(indices_grid, tf.stack([batch_size]))
+#        indices_grid = tf.reshape(indices_grid, (batch_size, 2, -1) )
+        
+#        affine_transformation = tf.concat([0.5*tf.ones([batch_size, 1]), 100*tf.ones([batch_size,1])], axis = 1)
+        
+        affine_transformation = tf.reshape(affine_transformation, (-1, num_channels, 1, 2)) # this line is necessary for tf.matmul to perform
+        affine_transformation = tf.cast(affine_transformation, 'float32')
+               
+#        print(indices_grid.shape)
+#        print(affine_transformation.shape)
+        transformed_grid = tf.matmul(affine_transformation, indices_grid) 
+#        transformed_grid = indices_grid[:,0,:]
+        
+        x_s_flatten = tf.reshape(transformed_grid, [-1])
+
+        transformed_vol = self._interpolate(input_sig, 
+                                                x_s_flatten,
+                                                output_size)
+
+        
+        return transformed_vol     
+
+
+class STN_1D_noweights(Layer):
+    '''
+    1D spatial transformer
+    '''
+
+    def __init__(self,
+#                 localization_net, # this suppose to produce a deformation with 3 channels
+                 output_size,
+                 **kwargs):
+#        self.locnet = localization_net
+        self.output_size = output_size
+        super(STN_1D_noweights, self).__init__(**kwargs)
+
+    def build(self, input_shape):
+#        self.locnet.build(input_shape)
+#        self.trainable_weights = self.locnet.trainable_weights
+        super(STN_1D_noweights, self).build(input_shape)
+
+    def compute_output_shape(self, input_shape):
+        output_size = self.output_size
+        return (None,
+                int(output_size[0]), # time
+                int(output_size[1]), # channels
+                )  
+
+    def call(self, X, mask=None): 
+        transformation, sig = X
+#        deformation = self.locnet.call(X)
+#        Y = tf.expand_dims(X[...,0], 4) # only transform the first channel
+        output = self._transform(transformation, sig, self.output_size) 
+        return output
+
+    def _repeat(self, x, num_repeats): # copy along the second dimension, each row is a copy of an index
+        ones = tf.ones((1, num_repeats), dtype='int32')
+        x = tf.reshape(x, shape=(-1,1))
+        x = tf.matmul(x, ones)
+        return tf.reshape(x, [-1])
+
+    def _interpolate(self, signal, x, output_size): 
+
+        batch_size = tf.shape(signal)[0]
+#        print(tf.keras.backend.int_shape(signal))
+        t_len = tf.shape(signal)[1]
+        num_channels = tf.shape(signal)[-1]
+
+        x = tf.cast(x , dtype='float32')
+        scale = tf.cast(output_size[0], dtype='float32')
+        
+        x = x * scale
 
         x0 = tf.cast(tf.floor(x), 'int32')
         x1 = x0 + 1
@@ -350,9 +492,10 @@ class STN_1D(Layer):
         return output
 
     def _meshgrid(self, t_length):
-        x_linspace = tf.linspace(0., t_length - 1., t_length)
+        x_linspace = tf.linspace(0., 1.0, t_length)
         ones = tf.ones_like(x_linspace)
-        indices_grid = tf.concat([x_linspace, ones], 0)
+        indices_grid = tf.concat([x_linspace, ones], axis=0)
+#        return tf.reshape(indices_grid, [-1])
         return indices_grid
 
     def _transform(self, affine_transformation, input_sig, output_size):
@@ -364,13 +507,16 @@ class STN_1D(Layer):
 
         indices_grid = tf.tile(indices_grid, tf.stack([batch_size]))
         indices_grid = tf.reshape(indices_grid, (batch_size, 2, -1) )
-
+        
+#        affine_transformation = tf.concat([0.5*tf.ones([batch_size, 1]), 100*tf.ones([batch_size,1])], axis = 1)
+        
         affine_transformation = tf.reshape(affine_transformation, (-1, 1, 2)) # this line is necessary for tf.matmul to perform
         affine_transformation = tf.cast(affine_transformation, 'float32')
-        
+               
 #        print(indices_grid.shape)
 #        print(affine_transformation.shape)
         transformed_grid = tf.matmul(affine_transformation, indices_grid) 
+#        transformed_grid = indices_grid[:,0,:]
         
         x_s_flatten = tf.reshape(transformed_grid, [-1])
 
@@ -380,6 +526,133 @@ class STN_1D(Layer):
 
         
         return transformed_vol     
+
+
+class STN_1D(Layer):
+    '''
+    1D spatial transformer
+    '''
+
+    def __init__(self,
+                 localization_net, # this suppose to produce a deformation with 3 channels
+                 output_size,
+                 **kwargs):
+        self.locnet = localization_net
+        self.output_size = output_size
+        super(STN_1D, self).__init__(**kwargs)
+
+    def build(self, input_shape):
+        self.locnet.build(input_shape)
+        self.trainable_weights = self.locnet.trainable_weights
+        super(STN_1D, self).build(input_shape)
+
+    def compute_output_shape(self, input_shape):
+        output_size = self.output_size
+        return (None,
+                int(output_size[0]), # time
+                int(output_size[1]), # channels
+                )  
+
+    def call(self, X, mask=None): 
+        deformation = self.locnet.call(X)
+#        Y = tf.expand_dims(X[...,0], 4) # only transform the first channel
+        output = self._transform(deformation, X, self.output_size) 
+        return output
+
+    def _repeat(self, x, num_repeats): # copy along the second dimension, each row is a copy of an index
+        ones = tf.ones((1, num_repeats), dtype='int32')
+        x = tf.reshape(x, shape=(-1,1))
+        x = tf.matmul(x, ones)
+        return tf.reshape(x, [-1])
+
+    def _interpolate(self, signal, x, output_size): 
+
+        batch_size = tf.shape(signal)[0]
+#        print(tf.keras.backend.int_shape(signal))
+        t_len = tf.shape(signal)[1]
+        num_channels = tf.shape(signal)[-1]
+
+        x = tf.cast(x , dtype='float32')
+        scale = tf.cast(output_size[0]-1, dtype='float32')
+        
+        x = x * scale
+
+        x0 = tf.cast(tf.floor(x), 'int32')
+        x1 = x0 + 1
+        
+        max_x = tf.cast(t_len - 1,  dtype='int32')        
+        zero = tf.zeros([], dtype='int32')
+
+        x0 = tf.clip_by_value(x0, zero, max_x)
+        x1 = tf.clip_by_value(x1, zero, max_x)
+
+        pts_batch = tf.range(batch_size)*t_len
+        flat_output_dimensions = output_size[0]
+        base = self._repeat(pts_batch, flat_output_dimensions)
+        
+#        print(base.shape)
+#        print(x0.shape)
+        ind_0 = base + x0
+        ind_1 = base + x1
+
+#        flat_signal = tf.transpose(signal, (0,2,1))
+        flat_signal = tf.reshape(signal, [-1, num_channels] )
+        flat_signal = tf.cast(flat_signal, dtype='float32')
+        
+       
+        pts_values_0 = tf.gather(flat_signal, ind_0)
+        pts_values_1 = tf.gather(flat_signal, ind_1)
+        
+        
+        x0 = tf.cast(x0, 'float32')
+        x1 = tf.cast(x1, 'float32')
+
+        
+        w_0 = tf.expand_dims(x1 - x, 1)
+        w_1 = tf.expand_dims(x - x0, 1)
+
+        output = w_0*pts_values_0 + w_1*pts_values_1
+        
+        output = tf.reshape(output, (-1, output_size[0], output_size[1]))
+          
+     
+        return output
+
+    def _meshgrid(self, t_length):
+        x_linspace = tf.linspace(0., 1.0, t_length)
+        ones = tf.ones_like(x_linspace)
+        indices_grid = tf.concat([x_linspace, ones], axis=0)
+#        return tf.reshape(indices_grid, [-1])
+        return indices_grid
+
+    def _transform(self, affine_transformation, input_sig, output_size):
+        batch_size = tf.shape(input_sig)[0]
+        t_len = output_size[0]
+#        num_channels = tf.shape(input_sig)[-1]
+              
+        indices_grid = self._meshgrid(t_len)
+
+        indices_grid = tf.tile(indices_grid, tf.stack([batch_size]))
+        indices_grid = tf.reshape(indices_grid, (batch_size, 2, -1) )
+        
+#        affine_transformation = tf.concat([0.5*tf.ones([batch_size, 1]), 100*tf.ones([batch_size,1])], axis = 1)
+        
+        affine_transformation = tf.reshape(affine_transformation, (-1, 1, 2)) # this line is necessary for tf.matmul to perform
+        affine_transformation = tf.cast(affine_transformation, 'float32')
+               
+#        print(indices_grid.shape)
+#        print(affine_transformation.shape)
+        transformed_grid = tf.matmul(affine_transformation, indices_grid) 
+#        transformed_grid = indices_grid[:,0,:]
+        
+        x_s_flatten = tf.reshape(transformed_grid, [-1])
+
+        transformed_vol = self._interpolate(input_sig, 
+                                                x_s_flatten,
+                                                output_size)
+
+        
+        return transformed_vol    
 
 class SpatialTransformer(Layer):
     """Spatial Transformer Layer

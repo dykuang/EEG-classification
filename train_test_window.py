@@ -17,7 +17,8 @@ Params = {
         'epochs': 100,
         'lr': 1e-4,
         'cut_off freq': 0.1,
-        'trunc rate': 1.0
+        'trunc rate': 1.0,
+        'share_w_channels': True
         }
 
 '''
@@ -71,13 +72,14 @@ from keras.optimizers import Adam
 
 win_net = locnet_window(Samples = Params['t-length'], 
                         Chans= Params['feature dim'], 
-                        kernLength = 15, norm_rate= 0.25)
+                        kernLength = 30, 
+                        share_w_channels = Params['share_w_channels'])
 
 win_net.name = "Window"
 
 cl_net = My_eeg_net_1d(Params['n classes'], Chans = Params['feature dim'], 
                   Samples = Params['win len'], 
-                  dropoutRate = 0.1, kernLength = 50, F1 = 32, 
+                  dropoutRate = 0.2, kernLength = 50, F1 = 32, 
                   D = 2, F2 = 64, norm_rate = 0.25, 
                   optimizer = Adam,
                   learning_rate=Params['lr'],
@@ -89,7 +91,8 @@ Mymodel = eeg_net(Window = win_net, Classifier=cl_net,
                   t_length = Params['t-length'], 
                   window_len = Params['win len'],
                   Chans = Params['feature dim'],
-                  optimizer=Adam(lr=Params['lr'])
+                  optimizer=Adam(lr=Params['lr']),
+                  share_w_channels = Params['share_w_channels']
                   )
 
 Mymodel.summary()
@@ -133,6 +136,9 @@ lr_schedule = LearningRateScheduler(myschedule)
 '''
 Train Model
 '''
+
+transformation_pre = win_net.predict(X_train_transformed)
+
 hist = Mymodel.fit(X_train_transformed, Ytrain_OH, 
             epochs=Params['epochs'], batch_size = Params['batchsize'],
             validation_data = (X_test_transformed, Ytest_OH),
@@ -163,15 +169,34 @@ a = re([X_train_transformed])[0]
 #start_point_scaled_back = start_point * (Params['t-length']-1)
 #start_point_scaled_back = np.floor(start_point_scaled_back)
 
-transformation = Mymodel.layers[-2].locnet.predict(X_train_transformed)
-grid = np.arange(Params['win len'])
-indices_grid = np.stack([grid, np.ones_like(grid)], axis=0)
-indices_grid = np.tile(indices_grid, np.stack([Params['samples']]))
-indices_grid = np.reshape(indices_grid, (Params['samples'], 2, -1) )
+transformation = win_net.predict(X_train_transformed)
+#grid = np.arange(Params['win len'])
+grid = np.linspace(0.0, 1.0, Params['win len'])
+indices_grid = np.stack([grid, np.ones_like(grid)], axis=0).flatten()
 
-transformation = np.reshape(transformation, (-1, 1, 2))
+share_w_channels = Params['share_w_channels']
+if share_w_channels:
+    indices_grid = np.tile(indices_grid, np.stack([Params['samples']]))
+    indices_grid = np.reshape(indices_grid, (Params['samples'], 2, -1) )
+    
+    #transformation = np.stack([0.5*np.ones( (Params['samples'], 1) ), 
+    #                           100*np.ones( (Params['samples'], 1) )], axis= 1)
+    
+    transformation = np.reshape(transformation, (-1, 1, 2))
+    
+    grid_transformed = np.matmul(transformation, indices_grid)
+else:
+    indices_grid = np.tile(indices_grid, np.stack([Params['samples']*Params['feature dim']]))
+    indices_grid = np.reshape(indices_grid, (Params['samples'], Params['feature dim'], 2, -1) )
+    
+    transformation = np.reshape(transformation, (-1, Params['feature dim'], 1, 2))
+    
+    grid_transformed = np.matmul(transformation, indices_grid)
 
-grid_transformed = np.matmul(transformation, indices_grid)
+grid_transformed = grid_transformed * (Params['win len'] - 1)
+
+
+
 
 import matplotlib.pyplot as plt
 plt.figure()
@@ -189,9 +214,26 @@ plt.legend(['Train', 'Test'])
 #plt.figure()
 #plt.hist(start_point_scaled_back[:,5])
 
+if share_w_channels:
+    plt.figure()
+    plt.subplot(2,2,1)
+    plt.hist(transformation_pre[:,0])
+    plt.subplot(2,2,2)
+    plt.hist(transformation_pre[:,1])
+    plt.subplot(2,2,3)
+    plt.hist(transformation[:,0,0])
+    plt.subplot(2,2,4)
+    plt.hist(transformation[:,0,1])
+
+
+ind =25
+channel = 0
 plt.figure()
-plt.plot(np.arange(Params['t-length']), X_train_transformed[0,:,0])
-plt.plot(grid_transformed[0,0,:], a[0,:,0])
+plt.plot(np.arange(Params['t-length']), X_train_transformed[ind,:,channel])
+if share_w_channels:
+    plt.plot(grid_transformed[ind,channel,:], a[ind,:,channel])
+else:
+    plt.plot(grid_transformed[ind,channel,0,:], a[ind,:,channel])
 plt.legend(['original','resampled'])
 
 

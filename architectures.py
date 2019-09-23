@@ -116,31 +116,31 @@ def My_eeg_net_1d(nb_classes, Chans = 64, Samples = 128,
         raise ValueError('dropoutType must be one of SpatialDropout2D '
                          'or Dropout, passed as a string.')
     
-    input1   = Input(shape = (Samples, Chans)) # treat multi-channel eeg as one frame of 2d-image
+    input1   = Input(shape = (Samples, Chans), name = 'input') # treat multi-channel eeg as one frame of 2d-image
 
     ##################################################################
 #    block1       = GaussianNoise(0.2)(input1)
     block1       = Conv1D(F1, kernLength, padding = 'same',
-                                   use_bias = False)(input1)  
+                                   use_bias = False, name = 'block1-C1D')(input1)  
 #    block1 = My_LSTM(block1, 32, 1, 32, inter_dim_list=None)
     
-    block1       = BatchNormalization()(block1)
+    block1       = BatchNormalization(name = 'block1-BN1')(block1)
     block1       = SeparableConv1D(F2, 8, use_bias = False,  #no Depthwise1D
                                    depthwise_constraint = max_norm(1.),
-                                   padding = 'same')(block1)
-    block1       = BatchNormalization()(block1)
-    block1       = Activation('elu')(block1)
+                                   padding = 'same', name = 'block1-SC1D')(block1)
+    block1       = BatchNormalization(name = 'block1-BN2')(block1)
+    block1       = Activation('elu', name = 'block1-AC')(block1)
 #    block1       = AveragePooling1D(8)(block1)
-    block1       = MaxPooling1D(8)(block1)
-    block1       = dropoutType(dropoutRate)(block1)
+    block1       = MaxPooling1D(8, name = 'block1-MP')(block1)
+    block1       = dropoutType(dropoutRate, name = 'block1-DP')(block1)
     
     block2       = SeparableConv1D(F2, 8,
-                                   use_bias = False, padding = 'same')(block1)
-    block2       = BatchNormalization()(block2)
-    block2       = Activation('elu')(block2)
-    block2       = AveragePooling1D(4)(block2)
+                                   use_bias = False, padding = 'same', name = 'block2-SC1D')(block1)
+    block2       = BatchNormalization(name = 'block2-BN')(block2)
+    block2       = Activation('elu', name = 'block2-AC')(block2)
+    block2       = AveragePooling1D(4, name = 'block2-AP')(block2)
 #    block2       = MaxPooling1D(4)(block2)
-    block2       = dropoutType(dropoutRate)(block2)
+    block2       = dropoutType(dropoutRate, name = 'block2-DP')(block2)
     
 #    block2       = SeparableConv1D(F2, 5,
 #                                   use_bias = False, padding = 'same')(block2)
@@ -405,8 +405,8 @@ def My_eeg_net_freq_selection(Sampler, Classifier, t_length, Chans, optimizer, l
     
     return Mymodel
 
-from modules import Window_trunc, Window_trunc_no_weights, SpatialTransformer, STN_1D
-def locnet_window(Samples, Chans, kernLength, norm_rate= 0.25):
+from modules import Window_trunc, Window_trunc_no_weights, SpatialTransformer, STN_1D, STN_1D_noweights, STN_1D_noweights_multi_channel
+def locnet_window(Samples, Chans, kernLength, share_w_channels=True):
     '''
     Take the input signal and outputs the starting points of truncated windows
     
@@ -414,7 +414,7 @@ def locnet_window(Samples, Chans, kernLength, norm_rate= 0.25):
     '''
     input1         = Input(shape = (Samples, Chans))
     
-    block_re       = SeparableConv1D(Chans, kernLength, padding = 'same',
+    block_re       = SeparableConv1D(16, kernLength, padding = 'same',
                                    use_bias = True)(input1)     
     block_re       = BatchNormalization()(block_re)
     block_re       = Activation('elu')(block_re)
@@ -423,34 +423,66 @@ def locnet_window(Samples, Chans, kernLength, norm_rate= 0.25):
     DownSampling path
     '''
     down_1         = MaxPooling1D(4)(block_re)
-    down_1         = SeparableConv1D(Chans*2, kernLength, padding = 'same',
+    down_1         = SeparableConv1D(16, kernLength, padding = 'same',
                                    use_bias = True)(down_1)     
     down_1         = BatchNormalization()(down_1)
     down_1         = Activation('elu')(down_1)
     
-    down_2         = MaxPooling1D(2)(down_1)
-    down_2         = SeparableConv1D(Chans*2, kernLength, padding = 'same',
-                                   use_bias = True)(down_2)     
-    down_2         = BatchNormalization()(down_2)
-    down_2         = Activation('elu')(down_2)
+#    down_2         = MaxPooling1D(2)(down_1)
+#    down_2         = SeparableConv1D(32, kernLength, padding = 'same',
+#                                   use_bias = True)(down_2)     
+#    down_2         = BatchNormalization()(down_2)
+#    down_2         = Activation('elu')(down_2)
+#    
+#    down_3         = MaxPooling1D(2)(down_2)
+#    down_3         = SeparableConv1D(64, kernLength, padding = 'same',
+#                                   use_bias = True)(down_3)     
+#    down_3         = BatchNormalization()(down_3)
+#    down_3         = Activation('elu')(down_3)
     
-    down_3         = MaxPooling1D(2)(down_2)
-    down_3         = SeparableConv1D(Chans*4, kernLength, padding = 'same',
-                                   use_bias = True)(down_3)     
-    down_3         = BatchNormalization()(down_3)
-    down_3         = Activation('elu')(down_3)
-    
-    flatten        = SeparableConv1D(1, 1, use_bias = True, padding = 'valid')(down_3)
+    flatten        = SeparableConv1D(1, 1, use_bias = True, padding = 'valid')(down_1)
     flatten        = Flatten()(flatten)
-                                   
-    out            = Dense(2, name = 'dense')(flatten)
-#                         kernel_constraint = max_norm(norm_rate))(flatten)
-#    out            = Activation('sigmoid', name = 'sigmoid')(out)
+    
+    if share_w_channels:                               
+        out            = Dense(2, name = 'dense',
+    #                           kernel_initializer=RandomNormal(mean=1.0, stddev=0.1),
+                               activation = 'sigmoid'
+                               )(flatten) # activation matters here
+#    out            = Activation('relu', name = 'sigmoid')(out)
+#        out_slope      = Dense(1, name = 'slope',
+#    #                           kernel_initializer=RandomNormal(mean=1.0, stddev=0.1),
+#                               activation = 'sigmoid'
+#                               )(flatten)
+#        out_shift      = Dense(1, name = 'shift',
+#    #                           kernel_initializer=RandomNormal(mean=0.0, stddev=1.0),
+#                               activation = 'tanh'
+#                               )(flatten)
+#        
+#        out            = concatenate([out_slope, out_shift], axis=-1)
+
+    else:
+        out            = Dense(2*Chans, name = 'dense',
+    #                           kernel_initializer=RandomNormal(mean=1.0, stddev=0.1),
+                               activation = 'sigmoid'
+                               )(flatten)
+    
+#        out_slope      = Dense(Chans, name = 'slope',
+#    #                           kernel_initializer=RandomNormal(mean=1.0, stddev=0.1),
+#                               activation = 'sigmoid'
+#                               )(flatten)
+#        out_shift      = Dense(Chans, name = 'shift',
+#    #                           kernel_initializer=RandomNormal(mean=0.0, stddev=1.0),
+#                               activation = 'tanh'
+#                               )(flatten)
+#        
+#        out            = concatenate([out_slope, out_shift], axis=-1)
+    
     
     return Model(input1, out, name='Window')
 
 
-def My_eeg_net_window(Window, Classifier, t_length, window_len, Chans, optimizer):
+def My_eeg_net_window(Window, Classifier, t_length, window_len, Chans, optimizer, 
+                      share_w_channels = True):
     
     
     _input   = Input(shape = (t_length, Chans))   
@@ -463,9 +495,15 @@ def My_eeg_net_window(Window, Classifier, t_length, window_len, Chans, optimizer
 #                                output_size=(window_len, Chans))(_input)
 #    windowed_signal = SpatialTransformer(localization_net = Window, 
 #                                output_size=(window_len, Chans))(_input)
-    windowed_signal = STN_1D(localization_net = Window, 
-                                output_size=(window_len, Chans))(_input)
+#    windowed_signal = STN_1D(localization_net = Window, 
+#                                output_size=(window_len, Chans))(_input)
     
+    trans = Window(_input)
+    if share_w_channels:
+        windowed_signal = STN_1D_noweights(output_size=(window_len, Chans))([trans, _input])
+    else:
+        windowed_signal = STN_1D_noweights_multi_channel(output_size=(window_len, Chans))([trans, _input])
+      
 #    proposed_starts  = Window(_input)
 #    windowed_signal = Window_trunc_no_weights(output_size=(window_len, Chans))([_input, proposed_starts])
     
