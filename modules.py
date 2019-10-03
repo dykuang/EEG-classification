@@ -1025,9 +1025,10 @@ class band_mask(Layer):
     '''
     Select frequencies from input with "learned" mask
     '''
-    def __init__(self, thres, **kwargs):
+    def __init__(self, thres, mask_type, **kwargs):
         
         self.thres = thres
+        self.mask_type = mask_type
         super(band_mask, self).__init__(**kwargs)
 
     def build(self, input_shape):
@@ -1042,12 +1043,48 @@ class band_mask(Layer):
     def call(self, X): 
         assert isinstance(X, list)
         signal, attention = X
-        cond = tf.greater(attention, tf.ones(tf.shape(attention))*self.thres)
-        mask = tf.where(cond, tf.ones(tf.shape(attention)), tf.zeros(tf.shape(attention)))
-        
-        signal_fft = tf.signal.rfft(tf.transpose(tf.cast(signal, 'float32'), (0,2,1)))
-        signal_fft_masked = tf.multiply(signal_fft, tf.transpose(tf.cast(mask,'complex64'), (0,2,1)) ) 
+        if self.mask_type == 'hard':
+            cond = tf.greater(attention, tf.ones(tf.shape(attention))*self.thres)
+            mask = tf.where(cond, tf.ones(tf.shape(attention)), tf.zeros(tf.shape(attention)))
+            
+            signal_fft = tf.signal.rfft(tf.transpose(tf.cast(signal, 'float32'), (0,2,1)))
+            signal_fft_masked = tf.multiply(signal_fft, tf.transpose(tf.cast(mask,'complex64'), (0,2,1)) ) 
+
+        else:
+            signal_fft_masked = tf.multiply(signal_fft, tf.transpose(tf.cast(attention,'complex64'), (0,2,1)) ) 
+ 
         signal_rec = tf.signal.irfft(signal_fft_masked)
         
         
         return tf.transpose(signal_rec, (0, 2, 1))   
+    
+class F_series(Layer):
+    def __init__(self, interval_length, num_components, **kwargs):
+        self.L = interval_length
+        self.N = num_components
+        super(F_series, self).__init__(**kwargs)
+        
+    def build(self, input_shape):
+        super(F_series, self).build(input_shape)
+        
+    def compute_output_shape(self, input_shape):
+        assert isinstance(input_shape, list)
+        shape_coef, shape_x = input_shape
+        return shape_x
+    
+    def call(self, X):
+        assert isinstance(X, list)
+        coef, x = X
+        angles = tf.range(1, 1+self.N)
+        angles = tf.cast(angles, 'float32')
+        Pi = tf.constant(3.1415926, 'float32')
+        omega = 2.0*Pi*angles/self.L
+        omega = tf.reshape(omega, (1, -1)) # (1,N)
+        
+        phase = tf.matmul(x, omega) # (batchsize, N)
+        cos_part = coef[:,1:1+self.N]*tf.math.cos(phase)
+        sin_part = coef[:,1+self.N:]*tf.math.sin(phase)
+        const = coef[:,:1]
+        
+        return const + tf.reduce_sum(cos_part + sin_part, 1, keepdims=True)
+        

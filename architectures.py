@@ -370,7 +370,7 @@ def My_eeg_net_pt_attd_2(Sampler, Classifier, t_length, Chans, optimizer, loss_w
     
     return Mymodel
 
-def My_eeg_net_freq_selection(Sampler, Classifier, t_length, Chans, optimizer, loss_weights, thres = 0.5):
+def My_eeg_net_freq_selection(Sampler, Classifier, t_length, Chans, optimizer, loss_weights, thres = 0.5, mask_type='hard'):
     
     
     _input   = Input(shape = (t_length, Chans))   
@@ -383,7 +383,7 @@ def My_eeg_net_freq_selection(Sampler, Classifier, t_length, Chans, optimizer, l
     
 #    signal_attention = mask(thres=0.5)([_input, att])
     att = ZeroPadding1D((0,1))(att)
-    signal_attention = band_mask(thres)([_input, att])
+    signal_attention = band_mask(thres, mask_type)([_input, att])
 #    print(signal_attention.shape)
     
     '''
