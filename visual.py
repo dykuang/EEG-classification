@@ -9,6 +9,14 @@ This script contains some functions for visualization
 
 import numpy as np
 import matplotlib.pyplot as plt
+
+def check_pred(true, pred):   
+    plt.figure()
+    plt.plot(true, color='r', alpha = 0.3)
+    plt.plot(pred)
+    plt.title('prediction')
+
+
 def vis_dist(X):
     '''
     Visualize the distribution of time series data X：
