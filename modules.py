@@ -1087,4 +1087,25 @@ class F_series(Layer):
         const = coef[:,:1]
         
         return const + tf.reduce_sum(cos_part + sin_part, 1, keepdims=True)
+    
+import keras.backend as K
+class Get_gradient(Layer):
+
+    def __init__(self, **kwargs):
+        super(Get_gradient, self).__init__(**kwargs)
+
+    def build(self, input_shape):
+        assert isinstance(input_shape, list)
+
+        super(Get_gradient, self).build(input_shape)  # Be sure to call this at the end
+
+    def call(self, x):
+        assert isinstance(x, list)
+        _out, _in = x
+        return K.gradients(_out, _in)
+
+    def compute_output_shape(self, input_shape):
+        assert isinstance(input_shape, list)
+        shape_out, shape_in = input_shape
+        return (shape_out[0], shape_in[1])
         
