@@ -7,6 +7,27 @@ Created on Wed Aug 21 16:26:34 2019
 Some Utility functions
 """
 import numpy as np
+import keras.backend as K
+
+def get_grad_tensor(outs, ins, order):
+    '''
+    getting the gradient of outs wrt ins till order 
+    '''
+    grad_tensor = [K.gradients(outs, ins)]
+    for o in range(1, order):
+        grad_tensor.append(K.gradients(grad_tensor[-1], ins))
+        
+    return grad_tensor
+
+def get_grad_val(outs, ins, order, eval_at):
+    '''
+    Actually compute the value of grad tensors evaluated at 'eval_at'
+    '''
+    grad_tensor = get_grad_tensor(outs, ins, order)
+    grad_func = K.function([ins], [tensor[0] for tensor in grad_tensor])
+    grad_val = grad_func([eval_at])
+    
+    return grad_val 
 
 def save_model(Model, filename='./model.h5', weights_only = True):
     if weights_only:
