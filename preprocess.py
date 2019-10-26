@@ -287,7 +287,23 @@ def band_decompose(X, fs=400, bands={'Delta': (0, 4),
     
     return np.stack(band_power, axis=1) # normalize?
 
-
+from sklearn.metrics.pairwise import cosine_similarity as cos
+def connect_matrix(X, win_len, skip=1):
+    '''
+    convert the (batch, seq, channels) input to (batch, seq, connect matrix) representation
+    win_len: length of moving window
+    skip: the skip of the moving window
+    '''
+    batchsize, nsamples, nchannels = X.shape 
+    nsplits = (nsamples-win_len)//skip +1
+    output = np.empty([batchsize, nsplits, nchannels, nchannels])
+    for i in range(nsplits):
+        trunc = X[:,i*skip:(i*skip+win_len),:].transpose(0, 2, 1)
+        for j in range(batchsize):
+            output[j,i,...] = cos(trunc[j], trunc[j])
+    
+    return output
+    
 
 '''
 Convert time series from numpy format to pandas dataframe suitable for tsfresh
