@@ -16,6 +16,269 @@ from keras.constraints import max_norm
 
 # model
 
+def TC_arc_sep(time_steps, num_channels, num_classes, num_down=None, optimizer=Adam, learning_rate=1e-3):
+    '''
+    Temporal convolutional blocks + MLP block
+    '''
+    
+    x_in = Input(shape=(time_steps, num_channels))
+    
+    
+    x1 = Conv1D(16, kernel_size=30, strides = 1, padding='same',use_bias = False)(x_in)
+    x2 = Conv1D(16, kernel_size=13, strides = 1, padding='same',use_bias = False)(x_in)
+    x3 = Conv1D(16, kernel_size=3, strides = 1, padding='same',use_bias = False)(x_in)
+    x4 = Conv1D(16, kernel_size=7, strides = 1, padding='same',use_bias = False)(x_in)
+    x = concatenate([x1,x2,x3,x4], axis=-1)
+    x = LeakyReLU(name='LR_1')(x)   
+        
+    x = SeparableConv1D(32, kernel_size=3, strides = 4,depth_multiplier=1,use_bias = False)(x)
+    x = LeakyReLU(name='LR_2')(x)
+    x = SpatialDropout1D(0.25)(x)
+    
+    x = SeparableConv1D(32, kernel_size=3, strides = 1,depth_multiplier=1,use_bias = False)(x)
+    x = LeakyReLU(name='LR_3')(x)
+    x = SeparableConv1D(32, kernel_size=3, strides = 4,depth_multiplier=1,use_bias = False)(x)
+    x = LeakyReLU(name='LR_4')(x)
+    x = SpatialDropout1D(0.25)(x)
+#    x = My_LSTM(x, 32, 1, 32, inter_dim_list=None)
+    
+    if num_down is not None:
+        for i in range(num_down):
+                x = SeparableConv1D(32, kernel_size=3, strides = 1,depth_multiplier=1,use_bias = False)(x)
+                x = LeakyReLU()(x)
+                x = SeparableConv1D(32, kernel_size=3, strides = 2,depth_multiplier=1,use_bias = False)(x)
+                x = LeakyReLU()(x)
+    
+    
+    x = Flatten()(x)
+    x = Dense(64, activation = 'relu', name = 'dense_1', kernel_constraint = max_norm(1.0))(x)
+    #x = BatchNormalization()(x)
+    x = Dropout(0.25)(x)
+    x = Dense(16, activation = 'relu', name = 'dense',kernel_constraint = max_norm(0.5))(x)
+    #x = BatchNormalization()(x)
+    x = Dropout(0.25)(x)
+    x_out = Dense(num_classes, activation = 'softmax', name = 'output')(x)
+    
+    Mymodel = Model(x_in, x_out)
+    
+    Mymodel.compile(loss='categorical_crossentropy', 
+                    metrics=['accuracy'],
+                    optimizer=optimizer(lr=learning_rate))
+    
+    return Mymodel
+
+def TC_arc_1(time_steps, num_channels, num_classes, 
+             num_down=None, optimizer=Adam, learning_rate=1e-3):
+    '''
+    A depthwise conv version of arc_1
+    '''
+    
+    x_in = Input(shape=(time_steps, num_channels))
+    
+    
+    x1 = Conv1D(16, kernel_size=30, strides = 1, padding='same',use_bias = False)(x_in)
+    x2 = Conv1D(16, kernel_size=13, strides = 1, padding='same',use_bias = False)(x_in)
+    x3 = Conv1D(16, kernel_size=3, strides = 1, padding='same',use_bias = False)(x_in)
+    x4 = Conv1D(16, kernel_size=7, strides = 1, padding='same',use_bias = False)(x_in)
+    x = concatenate([x1,x2,x3,x4], axis=-1)
+    x = LeakyReLU(name='LR_1')(x)   
+        
+    x = Conv1D(32, kernel_size=3, strides = 2,use_bias = False)(x)
+    x = LeakyReLU(name='LR_2')(x)
+      
+    x = Conv1D(32, kernel_size=3, strides = 1,use_bias = False)(x)
+    x = LeakyReLU(name='LR_3')(x)
+    x = Conv1D(32, kernel_size=3, strides = 2,use_bias = False)(x)
+    x = LeakyReLU(name='LR_4')(x)
+    
+#    x = My_LSTM(x, 32, 1, 32, inter_dim_list=None)
+    
+    if num_down is not None:
+        for i in range(num_down):
+                x = Conv1D(32, kernel_size=3, strides = 1)(x)
+                x = LeakyReLU()(x)
+                x = Conv1D(32, kernel_size=3, strides = 2)(x)
+                x = LeakyReLU()(x)
+    
+    
+    x = Flatten()(x)
+    x = Dense(64, activation = 'relu', name = 'dense_1', kernel_constraint = max_norm(1.0))(x)
+    #x = BatchNormalization()(x)
+    x = Dropout(0.5)(x)
+    x = Dense(16, activation = 'relu', name = 'dense', kernel_constraint = max_norm(0.5))(x)
+    #x = BatchNormalization()(x)
+    x = Dropout(0.5)(x)
+    x_out = Dense(num_classes, activation = 'softmax', name = 'output')(x)
+    
+    Mymodel = Model(x_in, x_out)
+    
+    Mymodel.compile(loss='categorical_crossentropy', 
+                    metrics=['accuracy'],
+                    optimizer=optimizer(lr=learning_rate))
+    
+    return Mymodel
+
+def TC_arc_2(time_steps, num_channels, num_classes, optimizer=Adam, learning_rate=1e-3):
+    '''
+    A variation from above with one extra input block
+    '''
+    x_in = Input(shape=(time_steps, num_channels))
+       
+    x1 = Conv1D(16, kernel_size=3, strides = 1, padding='same')(x_in)
+    x2 = Conv1D(16, kernel_size=1, strides = 1, padding='same')(x_in)
+    x3 = Conv1D(16, kernel_size=5, strides = 1, padding='same')(x_in)
+    x4 = Conv1D(16, kernel_size=7, strides = 1, padding='same')(x_in)
+    x = concatenate([x1,x2,x3,x4], axis=-1)
+    x = LeakyReLU(name='LR_1')(x)
+    
+    x_in_2 = Input(shape=(time_steps, num_channels))
+    x1_2 = Conv1D(16, kernel_size=3, strides = 1, padding='same')(x_in_2)
+    x2_2 = Conv1D(16, kernel_size=1, strides = 1, padding='same')(x_in_2)
+    x3_2 = Conv1D(16, kernel_size=5, strides = 1, padding='same')(x_in_2)
+    x4_2 = Conv1D(16, kernel_size=7, strides = 1, padding='same')(x_in_2)
+    x_2 = concatenate([x1_2,x2_2,x3_2,x4_2], axis=-1)
+    x_2 = LeakyReLU()(x_2)
+    
+    x = concatenate([x, x_2], axis=-1)
+    
+        
+    x = Conv1D(32, kernel_size=3, strides = 2)(x)
+    x = LeakyReLU(name='LR_2')(x)
+    
+    
+    x = Conv1D(32, kernel_size=3, strides = 1)(x)
+    x = LeakyReLU(name='LR_3')(x)
+    x = Conv1D(32, kernel_size=3, strides = 2)(x)
+    x = LeakyReLU(name='LR_4')(x)
+    
+    
+    x = Flatten()(x)
+    x = Dense(64, activation = 'relu', name = 'relu_1')(x)
+    #x = BatchNormalization()(x)
+    x = Dropout(0.5)(x)
+    x = Dense(16, activation = 'relu', name = 'relu_2')(x)
+    #x = BatchNormalization()(x)
+    x = Dropout(0.5)(x)
+    x_out = Dense(num_classes, activation = 'softmax')(x)
+    
+    Mymodel = Model(x_in, x_out)
+    
+    Mymodel.compile(loss='categorical_crossentropy', 
+                    metrics=['accuracy'],
+                    optimizer=optimizer(lr=learning_rate))
+    
+    return Mymodel
+
+def TC_arc_3(time_steps, num_channels, num_classes, optimizer=Adam, learning_rate=1e-3):
+    '''
+    Try the leaf classification net
+    '''
+    
+    x_in = Input(shape=(time_steps, num_channels))
+    x = Conv1D(filters= 16, kernel_size = 8, strides=4, padding='same', dilation_rate=1, 
+           activation='relu', use_bias=True, kernel_initializer='glorot_uniform',
+           bias_initializer='zeros', kernel_regularizer=None, bias_regularizer=None, 
+           activity_regularizer=None, kernel_constraint=None, bias_constraint=None,
+           name = 'conv1D_1')(x_in)
+    x = BatchNormalization()(x)
+    #x = PReLU()(x)
+    x = MaxPooling1D(pool_size=4, strides=2, name = 'MP_1')(x)
+    x = Flatten(name = 'flat_1')(x)
+    
+    x_x = Conv1D(filters= 24, kernel_size = 12, strides= 6, padding='same', dilation_rate=1, 
+           activation='relu', use_bias=True, kernel_initializer='glorot_uniform',
+           bias_initializer='zeros', kernel_regularizer=None, bias_regularizer=None, 
+           activity_regularizer=None, kernel_constraint=None, bias_constraint=None,
+           name = 'conv1D_2')(x_in)
+    x_x = BatchNormalization()(x_x)
+    #x_x = PReLU()(x_x)
+    x_x = MaxPooling1D(pool_size=4, strides=2, name = 'MP_2')(x_x)
+    x_x = Flatten(name = 'flat_2')(x_x)
+    
+    x_x_x = Conv1D(filters= 32, kernel_size = 16, strides= 8, padding='same', dilation_rate=1, 
+           activation='relu', use_bias=True, kernel_initializer='glorot_uniform',
+           bias_initializer='zeros', kernel_regularizer=None, bias_regularizer=None, 
+           activity_regularizer=None, kernel_constraint=None, bias_constraint=None,
+           name = 'conv1D_3')(x_in)
+    x_x_x = BatchNormalization()(x_x_x)
+
+    x_x_x = MaxPooling1D(pool_size=4, strides=2, name = 'MP_3')(x_x_x)
+    x_x_x = Flatten(name = 'flat_3')(x_x_x)
+
+    feature_f = Flatten(name = 'flat_4')(x_in)
+    #
+    x = concatenate([x, x_x, x_x_x, feature_f])
+    #x = BatchNormalization()(x) 
+    #x = Dropout(0.5)(x)
+    
+    x = Dense(512, activation = 'linear', name = 'dense_1')(x)
+    x = BatchNormalization()(x)
+    x = PReLU()(x)
+    #x = Dropout(0.5)(x)
+    
+    x = Dense(128, activation = 'linear', name = 'dense_2')(x) #increase the dimension here for better speration in stage2 ?
+    x = BatchNormalization()(x)
+    x = PReLU()(x)
+    x = Dropout(0.5)(x)
+    
+    
+    pred = Dense(num_classes, activation = 'softmax', name = 'dense_3')(x)
+    
+    Mymodel = Model(x_in, pred)
+    
+    Mymodel.compile(loss='categorical_crossentropy', 
+                    metrics=['accuracy'],
+                    optimizer=optimizer(lr=learning_rate))
+    
+    return Mymodel
+
+
+def TC_arc_4(time_steps, num_channels, num_classes, optimizer=Adam, learning_rate=1e-3):
+    '''
+    Temporal convolutional blocks (deep) + MLP block
+    '''
+    
+    x_in = Input(shape=(time_steps, num_channels))
+    
+    
+    x1 = Conv1D(16, kernel_size=30, strides = 1, padding='same')(x_in)
+    x2 = Conv1D(16, kernel_size=11, strides = 1, padding='same')(x_in)
+    x3 = Conv1D(16, kernel_size=5, strides = 1, padding='same')(x_in)
+    x4 = Conv1D(16, kernel_size=7, strides = 1, padding='same')(x_in)
+    x = concatenate([x1,x2,x3,x4], axis=-1)
+    x = LeakyReLU(name='LR_1')(x)   
+        
+    x = Conv1D(32, kernel_size=3, strides = 2)(x)
+    x = LeakyReLU(name='LR_2')(x)
+      
+    x = Conv1D(32, kernel_size=3, strides = 1)(x)
+    x = LeakyReLU(name='LR_3')(x)
+    x = Conv1D(32, kernel_size=3, strides = 2)(x)
+    x = LeakyReLU(name='LR_4')(x)
+    
+    for _ in range(7):
+            x_b = Conv1D(32, kernel_size=3, strides = 1, padding='same')(x)
+            x_b = LeakyReLU()(x_b)
+            x = add([x_b, x])
+            x = BatchNormalization()(x)
+        
+    x = Flatten()(x)
+    x = Dense(64, activation = 'relu', name = 'dense_1')(x)
+    #x = BatchNormalization()(x)
+    x = Dropout(0.5)(x)
+    x = Dense(16, activation = 'relu', name = 'dense_2')(x)
+    #x = BatchNormalization()(x)
+    x = Dropout(0.5)(x)
+    x_out = Dense(num_classes, activation = 'softmax', name = 'output')(x)
+    
+    Mymodel = Model(x_in, x_out)
+    
+    Mymodel.compile(loss='categorical_crossentropy', 
+                    metrics=['accuracy'],
+                    optimizer=optimizer(lr=learning_rate, decay=1e-3))
+    
+    return Mymodel
+
 '''
 Define a LSTM block
 '''
@@ -116,31 +379,31 @@ def My_eeg_net_1d(nb_classes, Chans = 64, Samples = 128,
         raise ValueError('dropoutType must be one of SpatialDropout2D '
                          'or Dropout, passed as a string.')
     
-    input1   = Input(shape = (Samples, Chans), name = 'input') # treat multi-channel eeg as one frame of 2d-image
+    input1   = Input(shape = (Samples, Chans)) # treat multi-channel eeg as one frame of 2d-image
 
     ##################################################################
 #    block1       = GaussianNoise(0.2)(input1)
     block1       = Conv1D(F1, kernLength, padding = 'same',
-                                   use_bias = False, name = 'block1-C1D')(input1)  
+                                   use_bias = False)(input1)  
 #    block1 = My_LSTM(block1, 32, 1, 32, inter_dim_list=None)
     
-    block1       = BatchNormalization(name = 'block1-BN1')(block1)
+    block1       = BatchNormalization()(block1)
     block1       = SeparableConv1D(F2, 8, use_bias = False,  #no Depthwise1D
                                    depthwise_constraint = max_norm(1.),
-                                   padding = 'same', name = 'block1-SC1D')(block1)
-    block1       = BatchNormalization(name = 'block1-BN2')(block1)
-    block1       = Activation('elu', name = 'block1-AC')(block1)
+                                   padding = 'same')(block1)
+    block1       = BatchNormalization()(block1)
+    block1       = Activation('elu')(block1)
 #    block1       = AveragePooling1D(8)(block1)
-    block1       = MaxPooling1D(8, name = 'block1-MP')(block1)
-    block1       = dropoutType(dropoutRate, name = 'block1-DP')(block1)
+    block1       = MaxPooling1D(8)(block1)
+    block1       = dropoutType(dropoutRate)(block1)
     
     block2       = SeparableConv1D(F2, 8,
-                                   use_bias = False, padding = 'same', name = 'block2-SC1D')(block1)
-    block2       = BatchNormalization(name = 'block2-BN')(block2)
-    block2       = Activation('elu', name = 'block2-AC')(block2)
-    block2       = AveragePooling1D(4, name = 'block2-AP')(block2)
+                                   use_bias = False, padding = 'same')(block1)
+    block2       = BatchNormalization()(block2)
+    block2       = Activation('elu')(block2)
+    block2       = AveragePooling1D(4)(block2)
 #    block2       = MaxPooling1D(4)(block2)
-    block2       = dropoutType(dropoutRate, name = 'block2-DP')(block2)
+    block2       = dropoutType(dropoutRate)(block2)
     
 #    block2       = SeparableConv1D(F2, 5,
 #                                   use_bias = False, padding = 'same')(block2)
@@ -169,6 +432,96 @@ def My_eeg_net_1d(nb_classes, Chans = 64, Samples = 128,
     softmax      = Activation(act, name = 'softmax')(dense)
     
     Mymodel = Model(input1, softmax)
+    Mymodel.compile(loss='categorical_crossentropy', 
+                    metrics=['accuracy'],
+                    optimizer=optimizer(lr=learning_rate))
+    
+    return Mymodel
+
+
+def My_eeg_net_1d_w_CM(nb_classes, Chans = 64, Samples = 128, 
+             dropoutRate = 0.5, kernLength = 64, F1 = 8, 
+             D = 2, F2 = 16, norm_rate = 0.25, 
+             optimizer = Adam,
+             learning_rate=1e-4,
+             dropoutType = 'Dropout',
+             act = 'softmax'):
+    '''
+    The 1d eeg net with static connectitvity matrix as extra input
+    '''
+    if dropoutType == 'SpatialDropout2D':
+        dropoutType = SpatialDropout2D
+    elif dropoutType == 'Dropout':
+        dropoutType = Dropout
+    else:
+        raise ValueError('dropoutType must be one of SpatialDropout2D '
+                         'or Dropout, passed as a string.')
+    
+    input1   = Input(shape = (Samples, Chans)) # treat multi-channel eeg as one frame of 2d-image
+    input2   = Input(shape = (Chans, Chans, 1))
+    
+    ##################################################################
+    # The 1d branch
+    ###################################################################
+#    block1       = GaussianNoise(0.2)(input1)
+    block1       = Conv1D(F1, kernLength, padding = 'same',
+                                   use_bias = False)(input1)  
+#    block1 = My_LSTM(block1, 32, 1, 32, inter_dim_list=None)
+    
+    block1       = BatchNormalization()(block1)
+    block1       = SeparableConv1D(F2, 8, use_bias = False,  #no Depthwise1D
+                                   depthwise_constraint = max_norm(1.),
+                                   padding = 'same')(block1)
+    block1       = BatchNormalization()(block1)
+    block1       = Activation('elu')(block1)
+#    block1       = AveragePooling1D(8)(block1)
+    block1       = MaxPooling1D(8)(block1)
+    block1       = dropoutType(dropoutRate)(block1)
+    
+    block2       = SeparableConv1D(F2, 8,
+                                   use_bias = False, padding = 'same')(block1)
+    block2       = BatchNormalization()(block2)
+    block2       = Activation('elu')(block2)
+    block2       = AveragePooling1D(4)(block2)
+#    block2       = MaxPooling1D(4)(block2)
+    block2       = dropoutType(dropoutRate)(block2)
+
+        
+    flatten1      = Flatten(name = 'flatten1')(block2)
+    
+    #####################################################################
+    # The 2d branch
+    #####################################################################
+    block       = Conv2D(32, 2, padding= 'same', use_bias = False)(input2)
+    block       = BatchNormalization(axis = -1)(block)
+    block       = DepthwiseConv2D(2, use_bias = False, 
+                                   depth_multiplier = 1,
+                                   depthwise_constraint = None)(block)
+    block       = Activation('elu')(block)
+    block       = AveragePooling2D((3, 3))(block)
+    
+    block       = SeparableConv2D(64, 2, use_bias = False, 
+                                   depth_multiplier = 1,
+                                   depthwise_constraint = max_norm(1.))(block)
+    block       = Activation('elu')(block)
+#    block       = AveragePooling2D((2, 2))(block)
+    block       = dropoutType(dropoutRate)(block)
+        
+    flatten2    = Flatten(name = 'flatten2')(block)
+#    dense2      = Dense(16, activation='elu')(flatten2)     
+    
+    
+    ######################################################################
+    # Merge to classify
+    ######################################################################
+    
+    flatten      = concatenate([flatten1, flatten2])
+    dense        = Dense(nb_classes, name = 'dense', 
+                         kernel_constraint = max_norm(norm_rate))(flatten)
+    
+    softmax      = Activation(act, name = 'softmax')(dense)
+    
+    Mymodel = Model([input1,input2], softmax)
     Mymodel.compile(loss='categorical_crossentropy', 
                     metrics=['accuracy'],
                     optimizer=optimizer(lr=learning_rate))
@@ -370,7 +723,7 @@ def My_eeg_net_pt_attd_2(Sampler, Classifier, t_length, Chans, optimizer, loss_w
     
     return Mymodel
 
-def My_eeg_net_freq_selection(Sampler, Classifier, t_length, Chans, optimizer, loss_weights, thres = 0.5, mask_type='hard'):
+def My_eeg_net_freq_selection(Sampler, Classifier, t_length, Chans, optimizer, loss_weights, thres = 0.5):
     
     
     _input   = Input(shape = (t_length, Chans))   
@@ -383,7 +736,7 @@ def My_eeg_net_freq_selection(Sampler, Classifier, t_length, Chans, optimizer, l
     
 #    signal_attention = mask(thres=0.5)([_input, att])
     att = ZeroPadding1D((0,1))(att)
-    signal_attention = band_mask(thres, mask_type)([_input, att])
+    signal_attention = band_mask(thres)([_input, att])
 #    print(signal_attention.shape)
     
     '''
@@ -405,8 +758,8 @@ def My_eeg_net_freq_selection(Sampler, Classifier, t_length, Chans, optimizer, l
     
     return Mymodel
 
-from modules import Window_trunc, Window_trunc_no_weights, SpatialTransformer, STN_1D, STN_1D_noweights, STN_1D_noweights_multi_channel
-def locnet_window(Samples, Chans, kernLength, share_w_channels=True):
+from modules import Window_trunc, Window_trunc_no_weights
+def locnet_window(Samples, Chans, kernLength, norm_rate= 0.25):
     '''
     Take the input signal and outputs the starting points of truncated windows
     
@@ -414,7 +767,7 @@ def locnet_window(Samples, Chans, kernLength, share_w_channels=True):
     '''
     input1         = Input(shape = (Samples, Chans))
     
-    block_re       = SeparableConv1D(16, kernLength, padding = 'same',
+    block_re       = SeparableConv1D(Chans, kernLength, padding = 'same',
                                    use_bias = True)(input1)     
     block_re       = BatchNormalization()(block_re)
     block_re       = Activation('elu')(block_re)
@@ -423,66 +776,34 @@ def locnet_window(Samples, Chans, kernLength, share_w_channels=True):
     DownSampling path
     '''
     down_1         = MaxPooling1D(4)(block_re)
-    down_1         = SeparableConv1D(16, kernLength, padding = 'same',
+    down_1         = SeparableConv1D(Chans*2, kernLength, padding = 'same',
                                    use_bias = True)(down_1)     
     down_1         = BatchNormalization()(down_1)
     down_1         = Activation('elu')(down_1)
     
-#    down_2         = MaxPooling1D(2)(down_1)
-#    down_2         = SeparableConv1D(32, kernLength, padding = 'same',
-#                                   use_bias = True)(down_2)     
-#    down_2         = BatchNormalization()(down_2)
-#    down_2         = Activation('elu')(down_2)
-#    
-#    down_3         = MaxPooling1D(2)(down_2)
-#    down_3         = SeparableConv1D(64, kernLength, padding = 'same',
-#                                   use_bias = True)(down_3)     
-#    down_3         = BatchNormalization()(down_3)
-#    down_3         = Activation('elu')(down_3)
+    down_2         = MaxPooling1D(2)(down_1)
+    down_2         = SeparableConv1D(Chans*2, kernLength, padding = 'same',
+                                   use_bias = True)(down_2)     
+    down_2         = BatchNormalization()(down_2)
+    down_2         = Activation('elu')(down_2)
     
-    flatten        = SeparableConv1D(1, 1, use_bias = True, padding = 'valid')(down_1)
+    down_3         = MaxPooling1D(2)(down_2)
+    down_3         = SeparableConv1D(Chans*4, kernLength, padding = 'same',
+                                   use_bias = True)(down_3)     
+    down_3         = BatchNormalization()(down_3)
+    down_3         = Activation('elu')(down_3)
+    
+    flatten        = SeparableConv1D(1, 1, use_bias = True, padding = 'valid')(down_3)
     flatten        = Flatten()(flatten)
-    
-    if share_w_channels:                               
-        out            = Dense(2, name = 'dense',
-    #                           kernel_initializer=RandomNormal(mean=1.0, stddev=0.1),
-                               activation = 'sigmoid'
-                               )(flatten) # activation matters here
-#    out            = Activation('relu', name = 'sigmoid')(out)
-#        out_slope      = Dense(1, name = 'slope',
-#    #                           kernel_initializer=RandomNormal(mean=1.0, stddev=0.1),
-#                               activation = 'sigmoid'
-#                               )(flatten)
-#        out_shift      = Dense(1, name = 'shift',
-#    #                           kernel_initializer=RandomNormal(mean=0.0, stddev=1.0),
-#                               activation = 'tanh'
-#                               )(flatten)
-#        
-#        out            = concatenate([out_slope, out_shift], axis=-1)
-
-    else:
-        out            = Dense(2*Chans, name = 'dense',
-    #                           kernel_initializer=RandomNormal(mean=1.0, stddev=0.1),
-                               activation = 'sigmoid'
-                               )(flatten)
-    
-#        out_slope      = Dense(Chans, name = 'slope',
-#    #                           kernel_initializer=RandomNormal(mean=1.0, stddev=0.1),
-#                               activation = 'sigmoid'
-#                               )(flatten)
-#        out_shift      = Dense(Chans, name = 'shift',
-#    #                           kernel_initializer=RandomNormal(mean=0.0, stddev=1.0),
-#                               activation = 'tanh'
-#                               )(flatten)
-#        
-#        out            = concatenate([out_slope, out_shift], axis=-1)
-    
+                                   
+    out            = Dense(Chans, name = 'dense', 
+                         kernel_constraint = max_norm(norm_rate))(flatten)
+    out            = Activation('sigmoid', name = 'sigmoid')(out)
     
     return Model(input1, out, name='Window')
 
 
-def My_eeg_net_window(Window, Classifier, t_length, window_len, Chans, optimizer, 
-                      share_w_channels = True):
+def My_eeg_net_window(Window, Classifier, t_length, window_len, Chans, optimizer):
     
     
     _input   = Input(shape = (t_length, Chans))   
@@ -491,19 +812,9 @@ def My_eeg_net_window(Window, Classifier, t_length, window_len, Chans, optimizer
     '''
     Truncate the singal
     '''
-#    windowed_signal = Window_trunc(localization_net = Window, 
-#                                output_size=(window_len, Chans))(_input)
-#    windowed_signal = SpatialTransformer(localization_net = Window, 
-#                                output_size=(window_len, Chans))(_input)
-#    windowed_signal = STN_1D(localization_net = Window, 
-#                                output_size=(window_len, Chans))(_input)
+    windowed_signal = Window_trunc(localization_net = Window, 
+                                output_size=(window_len, Chans))(_input)
     
-    trans = Window(_input)
-    if share_w_channels:
-        windowed_signal = STN_1D_noweights(output_size=(window_len, Chans))([trans, _input])
-    else:
-        windowed_signal = STN_1D_noweights_multi_channel(output_size=(window_len, Chans))([trans, _input])
-      
 #    proposed_starts  = Window(_input)
 #    windowed_signal = Window_trunc_no_weights(output_size=(window_len, Chans))([_input, proposed_starts])
     
