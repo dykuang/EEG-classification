@@ -55,7 +55,7 @@ def summarize_performance(model, step):
     print("Weights saved at step {}.".format(step))
     
 ## Train with fit_generator
-def generator(X, Y, batchsize, shift_limit = 5):
+def generator(X, Y, batchsize, shift_limit = 5, freq = 4):
     '''
     A generator for keras' training with "fit_generator"
     '''  
@@ -69,7 +69,7 @@ def generator(X, Y, batchsize, shift_limit = 5):
         X_gen = X[ind]
         Y_gen = Y[ind]
         
-        if prob < 3:
+        if prob < freq:
             rand_shift = np.random.choice(shift_limit*2) - shift_limit  
             X_gen = np.roll(X_gen, rand_shift, axis = -2)                              
 #            yield [np.roll(X_gen, rand_shift, axis = -2) , Y_gen] 
@@ -80,7 +80,7 @@ def generator(X, Y, batchsize, shift_limit = 5):
         yield [ X_gen, Y_gen.toarray() ] # sparse OH matrix causing errors in keras fit. set input(sparse = True) does not seem to solve it.
 
 
-def generator_freq(X, Y, batchsize, bandwidth = 30, dist_to_end = 50):
+def generator_freq(X, Y, batchsize, bandwidth = 30, dist_to_end = 50, freq = 5):
     '''
     augment input with cropped frequency 
     '''  
@@ -96,7 +96,7 @@ def generator_freq(X, Y, batchsize, bandwidth = 30, dist_to_end = 50):
         X_gen = X[ind]
         Y_gen = Y[ind]
         
-        if prob < 5:
+        if prob < freq:
             X_fft = np.fft.rfft(X_gen, axis=1)
             X_fft[:, start:end, :] = 0              
             X_gen = np.fft.irfft(X_fft, axis=1)                             
