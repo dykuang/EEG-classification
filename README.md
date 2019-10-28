@@ -16,7 +16,7 @@
 * `train_test_FS.py`: Using the band_mask module. A second network will predict a binary mask in the frequency domain and reconstructs signal to-be-classified using selected frequencies before feeding it to the downstream classifier.    
 * `train_testing_resample.py`: Using the resample module. A second network will produce a new grid (not uniformed, not necessarily the same resolution) to resample the input with interpolation. The resampled signal will then flow to the classifier.  It has the option to specify whether all channels will share the same grid or using different grids.    
 * `train_test_window.py`: Using the window_trunc module. A second network will predict a starting point. Input signals will be truncated from this point with fixed length before going to the classifier. (Does not compile with current implementation, still working on it.)  
-* `train_DCM.py`: Using the dynamic connectivity matrix as feature, which will be mapped to a latent representation with timely distributed dense layer and then a simply RNN will be used for classification.  
+* `train_DCM.py`: Using the dynamic connectivity matrix as feature, which will be mapped to a latent representation with timely distributed dense layer and then a simply RNN will be used for classification. (Huge gap between train and validation.)
 * `train_w_CM.py`: Based on `train.py`, adding a paralled second branch for taking the static connectivity matrix as one extra input.      
 * `train_PT_loc_tune.py`: Script for testing the performance when placing the attention module at different locations.  
 * `train_clf_vae.py`: Try combining the VAE with current classifier. The current version has problems in the quality of predicted reconstruction, need a fix.  
