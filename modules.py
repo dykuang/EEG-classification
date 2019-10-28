@@ -1091,7 +1091,10 @@ class F_series(Layer):
 import keras.backend as K
 class Get_gradient(Layer):
 
-    def __init__(self, **kwargs):
+    def __init__(self, order, return_all = False, **kwargs):
+        self.order = order
+        self.return_all = return_all
+        
         super(Get_gradient, self).__init__(**kwargs)
 
     def build(self, input_shape):
@@ -1102,10 +1105,49 @@ class Get_gradient(Layer):
     def call(self, x):
         assert isinstance(x, list)
         _out, _in = x
-        return K.gradients(_out, _in)
+        grad=[K.gradients(_out, _in)]
+        for ind in range(1, self.order):
+            grad.append(K.gradients(grad[-1], _in))
+#        if self.return_all:
+#            return grad
+#        
+#        else: 
+        return grad[-1]
+
 
     def compute_output_shape(self, input_shape):
         assert isinstance(input_shape, list)
         shape_out, shape_in = input_shape
-        return (shape_out[0], shape_in[1])
         
+        return (shape_out[0], shape_in[1])
+    
+
+class VAE_SamplingLayer(Layer):
+    def __init__(self, **kwargs):
+        super(VAE_SamplingLayer, self).__init__(**kwargs)
+        
+    def build(self, input_shape):
+        assert isinstance(input_shape, list)
+
+        super(VAE_SamplingLayer, self).build(input_shape)
+
+    def kl_div_loss(self, z_mean, z_log_var):
+        kl_loss = - 0.5 * K.sum(1 + z_log_var - K.square(z_mean) - K.exp(z_log_var), axis=-1)
+        return K.mean(kl_loss)
+
+    def call(self, inputs):
+        z_mean = inputs[0]
+        z_log_var = inputs[1]
+        batch_size = K.shape(z_mean)[0]
+        latent_dim = K.int_shape(z_mean)[1]
+        loss = self.kl_div_loss(z_mean, z_log_var)
+        self.add_loss(loss, inputs=inputs)
+        epsilon = K.random_normal(shape=(batch_size, latent_dim), mean=0.,
+                                  stddev=1.0)
+        return z_mean + K.exp(z_log_var / 2) * epsilon
+    
+    def compute_output_shape(self, input_shape):
+        assert isinstance(input_shape, list)
+        shape_a, shape_b = input_shape
+        
+        return shape_a
