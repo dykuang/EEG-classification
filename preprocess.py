@@ -304,6 +304,23 @@ def connect_matrix(X, win_len, skip=1):
     
     return output
     
+def get_lower_info(CM):
+    '''
+    Get the lower left part of the dynamic connectivity matrix representation as a time series
+    '''
+    batchsize, steps, height, width = CM.shape
+    feature_dim = (height*width - height)//2
+    output = np.empty([batchsize, steps, feature_dim])
+    
+    for b in range(batchsize):
+        for s in range(steps):
+            count = 0
+            for i in range(1,height):
+                for j in range(i):
+                    output[b,s,count] = CM[b,s,i,j]
+                    count+=1
+                    
+    return output
 
 '''
 Convert time series from numpy format to pandas dataframe suitable for tsfresh
