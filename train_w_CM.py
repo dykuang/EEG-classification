@@ -4,7 +4,7 @@ Created on Sat Oct 26 15:02:50 2019
 
 @author: dykua
 
-test the classifier with connectivity matrix as the extra input
+test the classifier with the static connectivity matrix as the extra input
 """
 
 from keras.optimizers import Adam, SGD
@@ -24,7 +24,7 @@ Load data
 '''
 
 
-dataset = 'BCI-IV-dataset3/'
+dataset = 'D:/EEG/archive/BCI-IV-dataset3/'
 subject = 2
 Xtrain = np.load(dataset+r'S{}train.npy'.format(subject))
 Xtest = np.load(dataset+r'S{}test.npy'.format(subject))
@@ -71,7 +71,7 @@ from architectures import My_eeg_net_1d_w_CM as eeg_net
 
 Mymodel = eeg_net(Params['n classes'], Chans = Params['feature dim'], 
                       Samples = Params['t-length'], 
-                      dropoutRate = 0.3, kernLength = 50, F1 = 32, 
+                      dropoutRate = 0.2, kernLength = 50, F1 = 32, 
                       D = 2, F2 = 64, norm_rate = 0.25, 
                       optimizer = Adam,
                       learning_rate=Params['lr'],

@@ -13,6 +13,7 @@ from keras.layers import Input, SeparableConv1D, Conv1D, Dense, Flatten, LeakyRe
 from keras.optimizers import Adam
 from keras.layers import UpSampling1D, MaxPooling1D, GlobalAveragePooling1D, SpatialDropout1D, Conv2D, AveragePooling1D, SeparableConv2D, SpatialDropout2D, DepthwiseConv2D, SeparableConv1D, Activation, AveragePooling2D
 from keras.constraints import max_norm
+from keras import regularizers
 
 # model
 
@@ -385,16 +386,19 @@ def My_eeg_net_1d(nb_classes, Chans = 64, Samples = 128,
 #    block1       = GaussianNoise(0.2)(input1)
     block1       = Conv1D(F1, kernLength, padding = 'same',
                                    use_bias = False)(input1)  
+    
 #    block1 = My_LSTM(block1, 32, 1, 32, inter_dim_list=None)
     
     block1       = BatchNormalization()(block1)
+#    block1       = Activation('elu')(block1)
+
     block1       = SeparableConv1D(F2, 8, use_bias = False,  #no Depthwise1D
                                    depthwise_constraint = max_norm(1.),
                                    padding = 'same')(block1)
     block1       = BatchNormalization()(block1)
     block1       = Activation('elu')(block1)
-#    block1       = AveragePooling1D(8)(block1)
-    block1       = MaxPooling1D(8)(block1)
+    block1       = AveragePooling1D(8)(block1)
+#    block1       = MaxPooling1D(8)(block1)
     block1       = dropoutType(dropoutRate)(block1)
     
     block2       = SeparableConv1D(F2, 8,
@@ -439,6 +443,105 @@ def My_eeg_net_1d(nb_classes, Chans = 64, Samples = 128,
     return Mymodel
 
 
+def My_eeg_net_1d_w_att(nb_classes, Chans = 64, Samples = 128, 
+             dropoutRate = 0.5, kernLength = 64, F1 = 8, 
+             D = 2, F2 = 16, norm_rate = 0.25, 
+             optimizer = Adam,
+             learning_rate=1e-4,
+             dropoutType = 'Dropout',
+             act = 'softmax'):
+    if dropoutType == 'SpatialDropout2D':
+        dropoutType = SpatialDropout2D
+    elif dropoutType == 'Dropout':
+        dropoutType = Dropout
+    else:
+        raise ValueError('dropoutType must be one of SpatialDropout2D '
+                         'or Dropout, passed as a string.')
+    
+    input1   = Input(shape = (Samples, Chans)) # treat multi-channel eeg as one frame of 2d-image
+
+    ##################################################################
+#    block1       = GaussianNoise(0.2)(input1)
+    block1       = Conv1D(F1, kernLength, padding = 'same',
+                                   use_bias = False)(input1)  
+    
+    block1       = BatchNormalization()(block1)
+    block1       = SeparableConv1D(F2, 8, use_bias = False,  #no Depthwise1D
+                                   depthwise_constraint = max_norm(1.),
+                                   padding = 'same')(block1)
+    block1       = BatchNormalization()(block1)
+    block1       = Activation('elu')(block1)
+#    block1       = AveragePooling1D(8)(block1)
+    block1       = MaxPooling1D(8)(block1)
+    block1       = dropoutType(dropoutRate)(block1)
+    
+#====================================================
+# The attantion block
+#==================================================    
+#    att          = locnet(12, 64, 3, 
+#                          output_channels = 64, pooling = None, 
+#                          activation='sigmoid')(block2)
+    block_re       = Conv1D(32, 3, padding = 'same',
+                                   use_bias = True)(block1)   
+    block_re       = BatchNormalization()(block_re)
+    block_re       = Activation('elu')(block_re)
+    att            = SeparableConv1D(64, 3, use_bias = True, padding = 'same', 
+#                                   depthwise_constraint = max_norm(1.), 
+                                   strides=1,
+#                                   kernel_initializer=RandomNormal(mean=0.0, stddev=1e-1),
+                                   activity_regularizer=regularizers.l1(1e-5),
+                                   activation = 'sigmoid')(block_re)
+    
+#    block2       = mask(0.5)([block2, att])  # reports error ?
+    block1       = multiply([block1, att])
+#========================================================
+    
+    block2       = SeparableConv1D(F2, 8,
+                                   use_bias = False, padding = 'same')(block1)
+    block2       = BatchNormalization()(block2)
+    block2       = Activation('elu')(block2)
+    block2       = AveragePooling1D(4)(block2)
+#    block2       = MaxPooling1D(4)(block2)
+    block2       = dropoutType(dropoutRate)(block2)
+  
+##====================================================
+## The attantion block
+##==================================================    
+##    att          = locnet(12, 64, 3, 
+##                          output_channels = 64, pooling = None, 
+##                          activation='sigmoid')(block2)
+#    block_re2       = Conv1D(64, 3, padding = 'same',
+#                                   use_bias = True)(block2)   
+#    block_re2       = BatchNormalization()(block_re2)
+#    block_re2       = Activation('elu')(block_re2)
+#    att2            = SeparableConv1D(64, 3, use_bias = True, padding = 'same', 
+##                                   depthwise_constraint = max_norm(1.), 
+#                                   strides=1,
+##                                   kernel_initializer=RandomNormal(mean=0.0, stddev=1e-1),
+#                                   activity_regularizer=regularizers.l1(1e-4),
+#                                   activation = 'sigmoid')(block_re2)
+#    
+##    block2       = mask(0.5)([block2, att])  # reports error ?
+#    block2       = multiply([block2, att2])
+##========================================================
+       
+    flatten      = Flatten(name = 'flatten')(block2)
+
+    
+    dense        = Dense(nb_classes, name = 'dense', 
+                         kernel_constraint = max_norm(norm_rate))(flatten)
+    
+#    dense        = add([dense, dense1])
+    softmax      = Activation(act, name = 'softmax')(dense)
+    
+    Mymodel = Model(input1, softmax)
+    Mymodel.compile(loss='categorical_crossentropy', 
+                    metrics=['accuracy'],
+                    optimizer=optimizer(lr=learning_rate))
+    
+    return Mymodel
+
+
 def My_eeg_net_1d_w_CM(nb_classes, Chans = 64, Samples = 128, 
              dropoutRate = 0.5, kernLength = 64, F1 = 8, 
              D = 2, F2 = 16, norm_rate = 0.25, 
@@ -457,7 +560,7 @@ def My_eeg_net_1d_w_CM(nb_classes, Chans = 64, Samples = 128,
         raise ValueError('dropoutType must be one of SpatialDropout2D '
                          'or Dropout, passed as a string.')
     
-    input1   = Input(shape = (Samples, Chans)) # treat multi-channel eeg as one frame of 2d-image
+    input1   = Input(shape = (Samples, Chans)) 
     input2   = Input(shape = (Chans, Chans, 1))
     
     ##################################################################
@@ -469,13 +572,15 @@ def My_eeg_net_1d_w_CM(nb_classes, Chans = 64, Samples = 128,
 #    block1 = My_LSTM(block1, 32, 1, 32, inter_dim_list=None)
     
     block1       = BatchNormalization()(block1)
+#    block1       = Activation('elu')(block1)
+    
     block1       = SeparableConv1D(F2, 8, use_bias = False,  #no Depthwise1D
                                    depthwise_constraint = max_norm(1.),
                                    padding = 'same')(block1)
     block1       = BatchNormalization()(block1)
     block1       = Activation('elu')(block1)
-#    block1       = AveragePooling1D(8)(block1)
-    block1       = MaxPooling1D(8)(block1)
+    block1       = AveragePooling1D(8)(block1)
+#    block1       = MaxPooling1D(8)(block1)
     block1       = dropoutType(dropoutRate)(block1)
     
     block2       = SeparableConv1D(F2, 8,
@@ -492,15 +597,16 @@ def My_eeg_net_1d_w_CM(nb_classes, Chans = 64, Samples = 128,
     #####################################################################
     # The 2d branch
     #####################################################################
-    block       = Conv2D(32, 2, padding= 'same', use_bias = False)(input2)
+    block       = Conv2D(32, 3, padding= 'same', use_bias = False)(input2)
     block       = BatchNormalization(axis = -1)(block)
+#    block       = Activation('elu')(block)
     block       = DepthwiseConv2D(2, use_bias = False, 
                                    depth_multiplier = 1,
                                    depthwise_constraint = None)(block)
     block       = Activation('elu')(block)
     block       = AveragePooling2D((3, 3))(block)
     
-    block       = SeparableConv2D(64, 2, use_bias = False, 
+    block       = SeparableConv2D(64, 3, use_bias = False, 
                                    depth_multiplier = 1,
                                    depthwise_constraint = max_norm(1.))(block)
     block       = Activation('elu')(block)
@@ -540,7 +646,7 @@ def locnet(Samples, Chans, kernLength, output_channels = 1, pooling = None, acti
     input1   = Input(shape = (Samples, Chans))
     
     block_re       = Conv1D(Chans, kernLength, padding = 'same',
-                                   use_bias = False)(input1)   
+                                   use_bias = True)(input1)   
     block_re        = BatchNormalization()(block_re)
     block_re       = Activation('elu')(block_re)
     block_re       = SeparableConv1D(output_channels, kernLength, use_bias = True, padding = 'same', 
@@ -656,7 +762,9 @@ def My_eeg_net_1d_resample(Sampler, Classifier, t_length, Chans, optimizer, loss
 
 from keras.layers import multiply
 def My_eeg_net_pt_attd(Sampler, Classifier, t_length, Chans, optimizer, loss_weights):
-    
+    '''
+    Point attention will be applied in a 'soft' way
+    '''
     
     _input   = Input(shape = (t_length, Chans))   
     
@@ -691,7 +799,9 @@ def My_eeg_net_pt_attd(Sampler, Classifier, t_length, Chans, optimizer, loss_wei
 from modules import mask, band_mask
 from keras.layers import ZeroPadding1D
 def My_eeg_net_pt_attd_2(Sampler, Classifier, t_length, Chans, optimizer, loss_weights, thres = 0.5):
-    
+    '''
+    Point attention will be applied in a 'hard' way
+    '''    
     
     _input   = Input(shape = (t_length, Chans))   
     
@@ -701,7 +811,7 @@ def My_eeg_net_pt_attd_2(Sampler, Classifier, t_length, Chans, optimizer, loss_w
     '''
     att = Sampler(_input)
     
-    signal_attention = mask(thres=0.5)([_input, att])
+    signal_attention = mask(thres)([_input, att])
 
     
     '''
@@ -936,4 +1046,144 @@ def EEGNet(nb_classes, Chans = 64, Samples = 128,
     softmax      = Activation(act, name = 'softmax')(dense)
     
     return Model(inputs=input1, outputs=softmax)
+
+import keras.backend as K
+from keras.layers import Lambda, Reshape
+from keras.losses import mean_squared_error as mse
+from loss import myLoss, KL_loss
+def sampling(args):
+    """Reparameterization trick by sampling from an isotropic unit Gaussian.
+
+    # Arguments
+        args (tensor): mean and log of variance of Q(z|X)
+
+    # Returns
+        z (tensor): sampled latent vector
+    """
+
+    z_mean, z_log_var = args
+    batch = K.shape(z_mean)[0]
+    dim = K.int_shape(z_mean)[1]
+    # by default, random_normal has mean = 0 and std = 1.0
+    epsilon = K.random_normal(shape=(batch, dim))
+    return z_mean + K.exp(0.5 * z_log_var) * epsilon
+
+
+from modules import VAE_SamplingLayer
+def My_eeg_net_vae(nb_classes, Chans = 64, Samples = 128, latent_dim = 1,
+             dropoutRate = 0.5, kernLength = 64, F1 = 8, 
+             D = 2, F2 = 16, norm_rate = 0.25, 
+             optimizer = Adam,
+             learning_rate=1e-4,
+             dropoutType = 'Dropout',
+             act = 'softmax'):
+    if dropoutType == 'SpatialDropout2D':
+        dropoutType = SpatialDropout2D
+    elif dropoutType == 'Dropout':
+        dropoutType = Dropout
+    else:
+        raise ValueError('dropoutType must be one of SpatialDropout2D '
+                         'or Dropout, passed as a string.')
+    
+    input1   = Input(shape = (Samples, Chans)) 
+    ##################################################################
+    # encoder
+    #=================================================================
+#    block1       = GaussianNoise(0.2)(input1)
+    block1       = SeparableConv1D(F1, kernLength, padding = 'same',
+                                   use_bias = False)(input1)     
+    block1       = BatchNormalization()(block1)
+    block1       = Activation('elu')(block1)
+    
+    block1       = SeparableConv1D(F2, 8, use_bias = False,  #no Depthwise1D
+                                   depthwise_constraint = max_norm(1.),
+                                   padding = 'same')(block1)
+    block1       = BatchNormalization()(block1)
+    block1       = Activation('elu')(block1)
+    block1       = AveragePooling1D(8)(block1)
+#    block1       = MaxPooling1D(8)(block1)
+    block1       = dropoutType(dropoutRate)(block1)
+    
+    block2       = SeparableConv1D(F2, 8,
+                                   use_bias = False, padding = 'same')(block1)
+    block2       = BatchNormalization()(block2)
+    block2       = Activation('elu')(block2)
+    block2       = AveragePooling1D(4)(block2)
+#    block2       = MaxPooling1D(4)(block2)
+    block2       = dropoutType(dropoutRate)(block2)
+            
+    flatten      = Flatten(name = 'flatten')(block2)
+    
+#    flatten      = Dense(64)(flatten)
+    
+    z_mu     = Dense(latent_dim, name = 'z_mu', 
+                         kernel_constraint = max_norm(norm_rate)
+                         )(flatten)
+    
+    z_log_sigma  = Dense(latent_dim, name = 'z_sigma', 
+                         kernel_constraint = max_norm(norm_rate)
+                         )(flatten)
+    
+#    z = Lambda(sampling, output_shape=(nb_classes,), name='z')([z_mu, z_log_sigma])
+    z = VAE_SamplingLayer()([z_mu, z_log_sigma])
+    
+    encoder = Model(input1, [z_mu, z_log_sigma, z], name='encoder')
+    #======================================================================
+    # decoder
+    #=======================================================================
+    
+    latent_inputs = Input(shape=(latent_dim,), name='z_sampling')
+    
+    dense        = Dense(768)(latent_inputs)
+#    dense         = Dense(768)(dense)
+    
+    reshaped     = Reshape((-1, F2))(dense)
+    
+    block2_T     = UpSampling1D(4)(reshaped)
+    block2_T     = SeparableConv1D(F2, 8,
+                                   use_bias = False, padding = 'same')(block2_T)
+    block2_T     = BatchNormalization()(block2_T)
+    block2_T     = Activation('elu')(block2_T)
+    block2_T     = ZeroPadding1D(1)(block2_T)
+    
+    block1_T     = UpSampling1D(8)(block2_T)
+    block1_T     = SeparableConv1D(F2, 8,
+                                   use_bias = False, padding = 'same')(block1_T)
+    block1_T     = BatchNormalization()(block1_T)
+    block1_T     = Activation('elu')(block1_T) 
+    
+    
+    decoder_output= SeparableConv1D(Chans, 1, activation='sigmoid', padding='same')(block1_T)
+
+    decoder = Model(latent_inputs, decoder_output, name = 'decoder')
+    
+    
+    
+#    VAE     = Model(input1, [z_mu, decoder(encoder(input1)[2])], name = 'vae')
+    
+#    reconstruction_loss = mse(input1, decoder(encoder(input1)[2]))
+#
+#    kl_loss = 1 + z_log_sigma - K.square(z_mu) - K.exp(z_log_sigma)
+#    kl_loss = K.sum(kl_loss, axis=-1)
+#    kl_loss *= -0.5
+#    vae_loss = K.mean(reconstruction_loss + kl_loss)
+#    VAE.add_loss(vae_loss)
+
+#    VAE.compile(loss=myLoss(), 
+##                    loss_weights = [1.0, 1.0, 1.0],
+#                    metrics=['accuracy'],
+#                    optimizer=optimizer(lr=learning_rate))
+    
+#    VAE     = Model(input1, [z_mu, decoder(encoder(input1)[2])], name = 'vae')
+#    VAE.compile(loss=['categorical_crossentropy', 'mse'], 
+#                    loss_weights = [1.0, 1.0],
+#                    metrics=['accuracy'],
+#                    optimizer=optimizer(lr=learning_rate))
+    
+    VAE     = Model(input1, decoder(encoder(input1)[-1]), name = 'vae')
+    VAE.compile(loss='mse', 
+#                    metrics=['accuracy'],
+                    optimizer=optimizer(lr=learning_rate))
+    
+    return VAE
 
