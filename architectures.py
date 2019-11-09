@@ -561,7 +561,7 @@ def My_eeg_net_1d_w_CM(nb_classes, Chans = 64, Samples = 128,
                          'or Dropout, passed as a string.')
     
     input1   = Input(shape = (Samples, Chans)) 
-    input2   = Input(shape = (Chans, Chans, 1))
+    input2   = Input(shape = (Chans, Chans, 15))
     
     ##################################################################
     # The 1d branch
@@ -604,10 +604,10 @@ def My_eeg_net_1d_w_CM(nb_classes, Chans = 64, Samples = 128,
                                    depth_multiplier = 1,
                                    depthwise_constraint = None)(block)
     block       = Activation('elu')(block)
-    block       = AveragePooling2D((3, 3))(block)
+    block       = AveragePooling2D((2, 2))(block)
     
     block       = SeparableConv2D(64, 3, use_bias = False, 
-                                   depth_multiplier = 1,
+                                   depth_multiplier = 2,
                                    depthwise_constraint = max_norm(1.))(block)
     block       = Activation('elu')(block)
 #    block       = AveragePooling2D((2, 2))(block)
@@ -833,7 +833,7 @@ def My_eeg_net_pt_attd_2(Sampler, Classifier, t_length, Chans, optimizer, loss_w
     
     return Mymodel
 
-def My_eeg_net_freq_selection(Sampler, Classifier, t_length, Chans, optimizer, loss_weights, thres = 0.5):
+def My_eeg_net_freq_selection(Sampler, Classifier, t_length, Chans, optimizer, loss_weights, thres = 0.5, mask_type='hard'):
     
     
     _input   = Input(shape = (t_length, Chans))   
@@ -844,9 +844,11 @@ def My_eeg_net_freq_selection(Sampler, Classifier, t_length, Chans, optimizer, l
     '''
     att = Sampler(_input)
     
+    
 #    signal_attention = mask(thres=0.5)([_input, att])
     att = ZeroPadding1D((0,1))(att)
-    signal_attention = band_mask(thres)([_input, att])
+    signal_attention = band_mask(thres, mask_type)([_input, att])
+
 #    print(signal_attention.shape)
     
     '''

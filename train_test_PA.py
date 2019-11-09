@@ -3,15 +3,8 @@
 Created on Sun Sep 15 17:06:16 2019
 
 @author: dykua
-"""
 
-# -*- coding: utf-8 -*-
-"""
-Created on Sun Sep  1 15:38:44 2019
-
-@author: dykua
-
-Test the point attention module
+TODO: Point Attention layer at different locations of eeg_net_1d
 """
 
 from keras.optimizers import Adam, SGD
@@ -23,7 +16,7 @@ Params = {
         'epochs': 200,
         'lr': 1e-4,
         'cut_off freq': 0.1,
-        'Attention thres': 0.3
+        'Attention thres': 0.5
         }
 
 '''
@@ -35,7 +28,7 @@ Load data
 #Ytest = np.load(r'../MI_test_D1_label.npy')
 #
 dataset = 'D:/EEG/archive/BCI-IV-dataset3/'
-subject = 1
+subject = 2
 Xtrain = np.load(dataset+r'S{}train.npy'.format(subject))
 Xtest = np.load(dataset+r'S{}test.npy'.format(subject))
 Ytrain = np.load(dataset+r'Ytrain.npy'.format(subject))

@@ -13,7 +13,7 @@ from sklearn.preprocessing import MinMaxScaler, OneHotEncoder, StandardScaler
 
 Params = {
         'batchsize': 32,
-        'epochs': 100,
+        'epochs': 80,
         'lr': 1e-4,
         'cut_off freq': 0.1,
         'num downsampling': None
@@ -32,23 +32,32 @@ Ytrain = np.load(dataset+r'Ytrain.npy'.format(subject))
 Ytest = np.load(dataset+r'S{}Ytest.npy'.format(subject))[0]
 
 
-
 '''
 Normalize data
 '''
 
-from sklearn.preprocessing import MinMaxScaler, StandardScaler
+#from sklearn.preprocessing import MinMaxScaler, StandardScaler
 from preprocess import normalize_in_time, normalize_samples, rolling_max, normalize_mvar, Buterworth_batch, connect_matrix
+#
+#X_train_transformed = Buterworth_batch(Xtrain, cut_off_freq = Params['cut_off freq'])
+#X_test_transformed = Buterworth_batch(Xtest, cut_off_freq = Params['cut_off freq'])
+#
+#X_train_transformed, X_test_transformed, _ = normalize_samples(X_train_transformed, X_test_transformed, MinMaxScaler, 0, 1)
 
-X_train_transformed = Buterworth_batch(Xtrain, cut_off_freq = Params['cut_off freq'])
-X_test_transformed = Buterworth_batch(Xtest, cut_off_freq = Params['cut_off freq'])
+from scipy.stats import zscore
+X_train_transformed = zscore(Xtrain, axis=1)
+X_test_transformed = zscore(Xtest, axis=1)
 
-X_train_transformed, X_test_transformed, _ = normalize_samples(X_train_transformed, X_test_transformed, MinMaxScaler, 0, 1)
+#X_train_transformed = zscore(X_train_transformed, axis=1)
+#X_test_transformed = zscore(X_test_transformed, axis=1)
 
 Params['samples'], Params['t-length'], Params['feature dim'] = X_train_transformed.shape
 
-X_train_CM = connect_matrix(X_train_transformed, 400, 1)[:,0,...,None]
-X_test_CM = connect_matrix(X_test_transformed, 400, 1)[:,0,...,None]
+#X_train_CM = connect_matrix(X_train_transformed, 400, 1)[:,0,...,None]
+#X_test_CM = connect_matrix(X_test_transformed, 400, 1)[:,0,...,None]
+
+X_train_CM = connect_matrix(X_train_transformed, 50, 25).transpose((0,2,3,1))
+X_test_CM = connect_matrix(X_test_transformed, 50, 25).transpose((0,2,3,1))
 
 '''
 One-Hot labels
@@ -71,7 +80,7 @@ from architectures import My_eeg_net_1d_w_CM as eeg_net
 
 Mymodel = eeg_net(Params['n classes'], Chans = Params['feature dim'], 
                       Samples = Params['t-length'], 
-                      dropoutRate = 0.2, kernLength = 50, F1 = 32, 
+                      dropoutRate = 0.4, kernLength = 50, F1 = 32, 
                       D = 2, F2 = 64, norm_rate = 0.25, 
                       optimizer = Adam,
                       learning_rate=Params['lr'],

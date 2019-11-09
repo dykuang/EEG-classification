@@ -16,7 +16,8 @@ Params = {
         'epochs': 100,
         'lr': 1e-4,
         'cut_off freq': 0.1,
-        'Attention thres': 0.33
+        'Attention thres': 0.33,
+        'mask type': 'hard'
         }
 
 '''
@@ -28,7 +29,7 @@ Load data
 #Ytest = np.load(r'../MI_test_D1_label.npy')
 #
 dataset = 'D:/EEG/archive/BCI-IV-dataset3/'
-subject = 1
+subject = 2
 Xtrain = np.load(dataset+r'S{}train.npy'.format(subject))
 Xtest = np.load(dataset+r'S{}test.npy'.format(subject))
 Ytrain = np.load(dataset+r'Ytrain.npy'.format(subject))
@@ -36,16 +37,21 @@ Ytest = np.load(dataset+r'S{}Ytest.npy'.format(subject))[0]
 '''
 Normalize data
 '''
+from scipy.stats import zscore
 
-from sklearn.preprocessing import MinMaxScaler, StandardScaler
-from preprocess import normalize_in_time, normalize_samples, rolling_max, normalize_mvar, Buterworth_batch
 
-X_train_transformed = Buterworth_batch(Xtrain, cut_off_freq = Params['cut_off freq'])
-X_test_transformed = Buterworth_batch(Xtest, cut_off_freq = Params['cut_off freq'])
+X_train_transformed = zscore(Xtrain, axis=1)
+X_test_transformed = zscore(Xtest, axis=1)
 
-#X_train_transformed, X_test_transformed, _ = normalize_samples(X_train_transformed, X_test_transformed, MinMaxScaler, 0, 1)
-
-X_train_transformed, X_test_transformed, _ = normalize_samples(Xtrain, Xtest, MinMaxScaler, 0, 1)
+#from sklearn.preprocessing import MinMaxScaler, StandardScaler
+#from preprocess import normalize_in_time, normalize_samples, rolling_max, normalize_mvar, Buterworth_batch
+#
+#X_train_transformed = Buterworth_batch(Xtrain, cut_off_freq = Params['cut_off freq'])
+#X_test_transformed = Buterworth_batch(Xtest, cut_off_freq = Params['cut_off freq'])
+#
+##X_train_transformed, X_test_transformed, _ = normalize_samples(X_train_transformed, X_test_transformed, MinMaxScaler, 0, 1)
+#
+#X_train_transformed, X_test_transformed, _ = normalize_samples(Xtrain, Xtest, MinMaxScaler, 0, 1)
 #X_train_transformed, X_test_transformed = normalize_mvar(X_train_transformed, X_test_transformed)
 
 Params['samples'], Params['t-length'], Params['feature dim'] = X_train_transformed.shape
@@ -92,8 +98,9 @@ cl_net.name = "Classifier"
 
 Mymodel = eeg_net(Sampler=att_net, Classifier=cl_net, 
                   t_length=Params['t-length'], Chans=Params['feature dim'],
-                  optimizer=Adam(lr=Params['lr']), loss_weights=[1.0, 0.001],
-                  thres = Params['Attention thres']
+                  optimizer=Adam(lr=Params['lr']), loss_weights=[1.0, 1.0],
+                  thres = Params['Attention thres'],
+                  mask_type = Params['mask type']
                   )
 
 Mymodel.summary()
@@ -155,6 +162,9 @@ pred_train, _ = Mymodel.predict(X_train_transformed)
 print("Acc on trained data: {}".format(accuracy_score(Ytrain, np.argmax(pred_train, axis=1))))
 pred_test, _ = Mymodel.predict(X_test_transformed)
 print("Acc on test data: {}".format(accuracy_score(Ytest, np.argmax(pred_test, axis=1))))
+
+from sklearn.metrics import confusion_matrix
+print(confusion_matrix(Ytest, np.argmax(pred_test, axis=1)) )
 
 '''
 For test purpose

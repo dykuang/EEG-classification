@@ -20,7 +20,7 @@ from sklearn.preprocessing import MinMaxScaler, OneHotEncoder, StandardScaler
 
 Params = {
         'batchsize': 32,
-        'epochs': 50,
+        'epochs': 100,
         'lr': 1e-4,
         'cut_off freq': 0.1,
         'num downsampling': None
@@ -42,35 +42,82 @@ Load data
 #Ytrain = np.load(r'../Ytrain1.npy')
 #Ytest = np.load(r'../Ytest1.npy')
 
+# ============== BCI-IV-set 3 ======================================
 dataset = 'D:/EEG/archive/BCI-IV-dataset3/'
-subject = 1
+subject = 2
 Xtrain = np.load(dataset+r'S{}train.npy'.format(subject))
 Xtest = np.load(dataset+r'S{}test.npy'.format(subject))
 Ytrain = np.load(dataset+r'Ytrain.npy'.format(subject))
 Ytest = np.load(dataset+r'S{}Ytest.npy'.format(subject))[0]
+# ===================================================================
 
 
-
+#========= Bonn ==================================
+# Can do a binary classification
+#===================================================
+# =============================================================================
+# dataset = 'D:/EEG/archive/Bonn/'
+# #H = np.load(dataset + 'Z.npy')[...,None]
+# #Y_H = np.zeros(len(H))
+# #U = np.load(dataset + 'N.npy')[...,None]
+# #Y_U = np.ones(len(U))
+# ##Y_U = np.zeros(len(U))
+# #S = np.load(dataset + 'Se.npy')
+# #Y_S = 2*np.ones(len(S))
+# ##Y_S = np.ones(len(S))
+# 
+# #X = np.vstack([H,U,S])
+# #Y = np.hstack([Y_H,Y_U,Y_S])
+# 
+# A = np.load(dataset + 'Z.npy')[...,None] ## healthy, eyes open
+# B = np.load(dataset + 'O.npy')[...,None] ## healthy, eyes closed
+# C = np.load(dataset + 'N.npy')[...,None] ## unhealthy, seizure free, not onsite
+# D = np.load(dataset + 'F.npy')[...,None] ## unhealthy, seizure free, onsite
+# E = np.load(dataset + 'S.npy')[...,None] ## unhealthy, seizure
+# 
+# #A = np.stack([A[:,i*400:(i+1)*400,:] for i in range(10)], axis=-1)[...,0,:]
+# #B = np.stack([B[:,i*400:(i+1)*400,:] for i in range(10)], axis=-1)[...,0,:]
+# #C = np.stack([C[:,i*400:(i+1)*400,:] for i in range(10)], axis=-1)[...,0,:]
+# #D = np.stack([D[:,i*400:(i+1)*400,:] for i in range(10)], axis=-1)[...,0,:]
+# #E = np.stack([E[:,i*400:(i+1)*400,:] for i in range(10)], axis=-1)[...,0,:]
+# 
+# #X = np.vstack([A,B,C,D,E])
+# #Y = np.hstack([np.zeros(len(A)),np.ones(len(B)),2*np.ones(len(C)),3*np.ones(len(D)),4*np.ones(len(E))])
+# 
+# X = np.vstack([B, D, E])
+# Y = np.hstack([np.zeros(len(B)),np.ones(len(D)), 2*np.ones(len(E))])
+# 
+# from sklearn.model_selection import train_test_split
+# Xtrain, Xtest, Ytrain, Ytest = train_test_split(
+#                                 X, Y, test_size=0.4, random_state=42)
+# =============================================================================
 '''
 Normalize data
 '''
-
 #X_train_transformed = Xtrain[:,:75,:]
 #X_test_transformed = Xtest[:,:75,:]
 from sklearn.preprocessing import MinMaxScaler, StandardScaler
 from preprocess import normalize_in_time, normalize_samples, rolling_max, normalize_mvar, Buterworth_batch
 
-X_train_transformed = Buterworth_batch(Xtrain, cut_off_freq = Params['cut_off freq'])
-X_test_transformed = Buterworth_batch(Xtest, cut_off_freq = Params['cut_off freq'])
+#X_train_transformed = Buterworth_batch(Xtrain, cut_off_freq = Params['cut_off freq'])
+#X_test_transformed = Buterworth_batch(Xtest, cut_off_freq = Params['cut_off freq'])
 
-X_train_transformed, X_test_transformed, _ = normalize_samples(X_train_transformed, X_test_transformed, MinMaxScaler, 0, 1)
-#X_train_transformed, X_test_transformed, _ = normalize_samples(Xtrain, Xtest, MinMaxScaler, 0, 1)
+
+from scipy.stats import zscore
+
+#X_train_transformed = zscore(X_train_transformed, axis=1)
+#X_test_transformed = zscore(X_test_transformed, axis=1)
+
+X_train_transformed = zscore(Xtrain, axis=1)
+X_test_transformed = zscore(Xtest, axis=1)
+#
+#X_train_transformed, X_test_transformed, _ = normalize_samples(X_train_transformed, X_test_transformed, MinMaxScaler, 0, 1)
 
 #X_train_transformed, X_test_transformed = normalize_mvar(X_train_transformed, X_test_transformed)
 
 #X_train_transformed = normalize_in_time(Xtrain,smooth = True, cut_off_freq = Params['cut_off freq'], order = 3)
 #X_test_transformed = normalize_in_time(Xtest,smooth = True, cut_off_freq = Params['cut_off freq'], order = 3)
-#X_train_transformed, X_test_transformed, _ = normalize_samples(X_train_transformed, X_test_transformed, MinMaxScaler, 0, 1)
+##X_train_transformed, X_test_transformed, _ = normalize_samples(X_train_transformed, X_test_transformed, MinMaxScaler, 0, 1)
 
 #X_train_transformed = X_train_transformed[:,:,:2]
 #X_test_transformed = X_test_transformed[:,:,:2]
@@ -115,7 +162,7 @@ else:
 
 Mymodel = eeg_net(Params['n classes'], Chans = Params['feature dim'], 
                       Samples = Params['t-length'], 
-                      dropoutRate = 0.2, kernLength = 50, F1 = 32, 
+                      dropoutRate = 0.4, kernLength = 50, F1 = 32, 
                       D = 2, F2 = 64, norm_rate = 0.25, 
                       optimizer = Adam,
                       learning_rate=Params['lr'],
@@ -125,7 +172,7 @@ Mymodel = eeg_net(Params['n classes'], Chans = Params['feature dim'],
 Mymodel.summary()
 
 
-from keras.callbacks import TensorBoard, ReduceLROnPlateau, LearningRateScheduler
+from keras.callbacks import TensorBoard, ReduceLROnPlateau, LearningRateScheduler, EarlyStopping
 from datetime import datetime
 
 '''
@@ -156,12 +203,17 @@ def myschedule(epochs, lr):
 
 lr_schedule = LearningRateScheduler(myschedule)
 
+ES = EarlyStopping(monitor='val_loss', 
+                   min_delta=0.01, 
+                   patience=6, 
+                   verbose=0, mode='auto', baseline= None, restore_best_weights=True)
+
 '''
 Train Model
 '''
-randshift = False
-randfreq = True
-aug = True
+randshift = True
+randfreq = False
+aug = False
 if aug:
     if randshift:
         from Utils import generator
@@ -185,14 +237,17 @@ if aug:
                                      workers=1, use_multiprocessing=False, shuffle=True)
 
 else:
-    weight_dict = np.array([1.0,1.0,1.0,1.0])
+#    weight_dict = np.array([1.0,1.0,1.0,1.0])
+#    weight_dict = np.array([1.0,1.0,1.0, 1.0,1.0])
+#    weight_dict = np.array([1.0, 1.0]) # for binary
     hist = Mymodel.fit(X_train_transformed, Ytrain_OH, 
                 epochs=Params['epochs'], batch_size = Params['batchsize'],
                 validation_data = (X_test_transformed, Ytest_OH),
-    #            validation_split=0.2,
+#                validation_split=0.2,
                 verbose=1,
                 callbacks=[],
-                class_weight = weight_dict)
+#                class_weight = weight_dict
+                )
 
 #Mymodel.save_weights('Mymodel_weights.h5')
 
@@ -276,6 +331,6 @@ plt.figure()
 for i in range(4):
 #    ind=[3, 1, 2, 0]
     plt.subplot(4,1,1+i)
-    CAM_on_input(Mymodel, -2, Ytrain[40*i], X_train_transformed[40*i], -5)
+    CAM_on_input(Mymodel, -2, int(Ytrain[40*i]), X_train_transformed[40*i], -5)
     plt.title('sample {}, True label {}, Pred label{}'.format(40*i, Ytrain[40*i], np.argmax(pred_train[40*i],-1)))
     

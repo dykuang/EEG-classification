@@ -1043,11 +1043,11 @@ class band_mask(Layer):
     def call(self, X): 
         assert isinstance(X, list)
         signal, attention = X
+        signal_fft = tf.signal.rfft(tf.transpose(tf.cast(signal, 'float32'), (0,2,1)))
         if self.mask_type == 'hard':
             cond = tf.greater(attention, tf.ones(tf.shape(attention))*self.thres)
             mask = tf.where(cond, tf.ones(tf.shape(attention)), tf.zeros(tf.shape(attention)))
             
-            signal_fft = tf.signal.rfft(tf.transpose(tf.cast(signal, 'float32'), (0,2,1)))
             signal_fft_masked = tf.multiply(signal_fft, tf.transpose(tf.cast(mask,'complex64'), (0,2,1)) ) 
 
         else:
