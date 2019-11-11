@@ -13,7 +13,7 @@ from sklearn.preprocessing import MinMaxScaler, OneHotEncoder, StandardScaler
 
 Params = {
         'batchsize': 32,
-        'epochs': 80,
+        'epochs': 100,
         'lr': 1e-4,
         'cut_off freq': 0.1,
         'num downsampling': None
@@ -25,7 +25,7 @@ Load data
 
 
 dataset = 'D:/EEG/archive/BCI-IV-dataset3/'
-subject = 2
+subject = 1
 Xtrain = np.load(dataset+r'S{}train.npy'.format(subject))
 Xtest = np.load(dataset+r'S{}test.npy'.format(subject))
 Ytrain = np.load(dataset+r'Ytrain.npy'.format(subject))
@@ -37,11 +37,11 @@ Normalize data
 '''
 
 #from sklearn.preprocessing import MinMaxScaler, StandardScaler
-from preprocess import normalize_in_time, normalize_samples, rolling_max, normalize_mvar, Buterworth_batch, connect_matrix
+from preprocess import normalize_in_time, normalize_samples, normalize_mvar, Buterworth_batch, connect_matrix, get_lower_info
 #
 #X_train_transformed = Buterworth_batch(Xtrain, cut_off_freq = Params['cut_off freq'])
 #X_test_transformed = Buterworth_batch(Xtest, cut_off_freq = Params['cut_off freq'])
-#
+##
 #X_train_transformed, X_test_transformed, _ = normalize_samples(X_train_transformed, X_test_transformed, MinMaxScaler, 0, 1)
 
 from scipy.stats import zscore
@@ -56,8 +56,22 @@ Params['samples'], Params['t-length'], Params['feature dim'] = X_train_transform
 #X_train_CM = connect_matrix(X_train_transformed, 400, 1)[:,0,...,None]
 #X_test_CM = connect_matrix(X_test_transformed, 400, 1)[:,0,...,None]
 
-X_train_CM = connect_matrix(X_train_transformed, 50, 25).transpose((0,2,3,1))
-X_test_CM = connect_matrix(X_test_transformed, 50, 25).transpose((0,2,3,1))
+#
+#X_train_CM = connect_matrix(X_train_transformed, 50, 25).transpose((0,2,3,1))
+#X_test_CM = connect_matrix(X_test_transformed, 50, 25).transpose((0,2,3,1))
+
+X_train_CM = connect_matrix(X_train_transformed, 40, 20)
+X_test_CM = connect_matrix(X_test_transformed, 40, 20)
+
+X_train_CM = get_lower_info(X_train_CM)
+X_test_CM = get_lower_info(X_test_CM)
+
+X_train_CM = zscore(X_train_CM, axis=1)
+X_test_CM = zscore(X_test_CM, axis=1)
+
+#
+#X_train_CM = (X_train_CM - np.amin(X_train_CM))/2
+#X_test_CM = (X_test_CM - np.amin(X_test_CM))/2
 
 '''
 One-Hot labels
@@ -80,7 +94,7 @@ from architectures import My_eeg_net_1d_w_CM as eeg_net
 
 Mymodel = eeg_net(Params['n classes'], Chans = Params['feature dim'], 
                       Samples = Params['t-length'], 
-                      dropoutRate = 0.4, kernLength = 50, F1 = 32, 
+                      dropoutRate = 0.5, kernLength = 50, F1 = 32, 
                       D = 2, F2 = 64, norm_rate = 0.25, 
                       optimizer = Adam,
                       learning_rate=Params['lr'],
@@ -168,8 +182,8 @@ Visualize training history
 import matplotlib.pyplot as plt
 plt.plot(hist.history['loss'])
 plt.figure()
-plt.plot(hist.history['acc'])
-plt.plot(hist.history['val_acc'])
+plt.plot(hist.history['accuracy'])
+plt.plot(hist.history['val_accuracy'])
 
 '''
 Summary statistics
@@ -187,7 +201,26 @@ print(confusion_matrix(Ytest, np.argmax(pred_test, axis=1)) )
 #'''
 #some visualizations of activations in conv layers
 #'''
-   
+'''
+Forming a combined classifier: NN + SVM
+'''
+from sklearn import svm
+import keras.backend as K
+clf = svm.SVC(C=1.0, gamma=0.001, decision_function_shape='ovr', 
+              kernel = 'rbf', degree=3,
+              class_weight=None, tol=1e-3)
+
+act = K.function([Mymodel.layers[0].input, Mymodel.layers[5].input], [Mymodel.get_layer('dense').output])
+
+feature = act([X_train_transformed,X_train_CM])
+feature_test = act([X_test_transformed, X_test_CM])
+to_svm = feature[-1]
+to_svm_test = feature_test[-1]
+
+clf.fit(to_svm, Ytrain)
+pred_test_svm = clf.predict(to_svm_test)
+print("Acc with an extra SVM: {}".format(accuracy_score(pred_test_svm, Ytest)))   
+print(confusion_matrix(Ytest, pred_test_svm) )
     
 
     

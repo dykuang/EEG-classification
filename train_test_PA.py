@@ -13,10 +13,10 @@ from sklearn.preprocessing import MinMaxScaler, OneHotEncoder, StandardScaler
 
 Params = {
         'batchsize': 32,
-        'epochs': 200,
+        'epochs': 100,
         'lr': 1e-4,
         'cut_off freq': 0.1,
-        'Attention thres': 0.5
+        'Attention thres': 0.4
         }
 
 '''
@@ -40,12 +40,16 @@ Normalize data
 from sklearn.preprocessing import MinMaxScaler, StandardScaler
 from preprocess import normalize_in_time, normalize_samples, rolling_max, normalize_mvar, Buterworth_batch
 
-X_train_transformed = Buterworth_batch(Xtrain, cut_off_freq = Params['cut_off freq'])
-X_test_transformed = Buterworth_batch(Xtest, cut_off_freq = Params['cut_off freq'])
+from scipy.stats import zscore
+X_train_transformed = zscore(Xtrain, axis=1)
+X_test_transformed = zscore(Xtest, axis=1)
+
+#X_train_transformed = Buterworth_batch(Xtrain, cut_off_freq = Params['cut_off freq'])
+#X_test_transformed = Buterworth_batch(Xtest, cut_off_freq = Params['cut_off freq'])
 
 #X_train_transformed, X_test_transformed, _ = normalize_samples(X_train_transformed, X_test_transformed, MinMaxScaler, 0, 1)
 
-X_train_transformed, X_test_transformed, _ = normalize_samples(Xtrain, Xtest, MinMaxScaler, 0, 1)
+#X_train_transformed, X_test_transformed, _ = normalize_samples(Xtrain, Xtest, MinMaxScaler, 0, 1)
 #X_train_transformed, X_test_transformed = normalize_mvar(X_train_transformed, X_test_transformed)
 
 Params['samples'], Params['t-length'], Params['feature dim'] = X_train_transformed.shape
@@ -109,18 +113,18 @@ from datetime import datetime
 '''
 Some call back functions
 '''
-logdir = "tf-log-test/"+datetime.now().strftime("%Y%m%d-%H%M%S")+'/'
-tf_callback = TensorBoard(log_dir = logdir, 
-                          histogram_freq=0,
-                          write_graph=True,
-                          write_images=True,
-                          write_grads=False,
-                          batch_size = 32,
-                          embeddings_freq=0, 
-                          embeddings_layer_names=None, 
-                          embeddings_metadata=None, 
-                          embeddings_data=X_test_transformed,
-                          )
+#logdir = "tf-log-test/"+datetime.now().strftime("%Y%m%d-%H%M%S")+'/'
+#tf_callback = TensorBoard(log_dir = logdir, 
+#                          histogram_freq=0,
+#                          write_graph=True,
+#                          write_images=True,
+#                          write_grads=False,
+#                          batch_size = 32,
+#                          embeddings_freq=0, 
+#                          embeddings_layer_names=None, 
+#                          embeddings_metadata=None, 
+#                          embeddings_data=X_test_transformed,
+#                          )
 
 reduce_lr = ReduceLROnPlateau(monitor='val_acc', factor=0.5,
                               patience=5, min_lr=1e-6)

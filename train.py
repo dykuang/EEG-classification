@@ -44,7 +44,7 @@ Load data
 
 # ============== BCI-IV-set 3 ======================================
 dataset = 'D:/EEG/archive/BCI-IV-dataset3/'
-subject = 2
+subject = 1
 Xtrain = np.load(dataset+r'S{}train.npy'.format(subject))
 Xtest = np.load(dataset+r'S{}test.npy'.format(subject))
 Ytrain = np.load(dataset+r'Ytrain.npy'.format(subject))
@@ -162,7 +162,7 @@ else:
 
 Mymodel = eeg_net(Params['n classes'], Chans = Params['feature dim'], 
                       Samples = Params['t-length'], 
-                      dropoutRate = 0.4, kernLength = 50, F1 = 32, 
+                      dropoutRate = 0.5, kernLength = 50, F1 = 32, 
                       D = 2, F2 = 64, norm_rate = 0.25, 
                       optimizer = Adam,
                       learning_rate=Params['lr'],
@@ -257,8 +257,8 @@ Visualize training history
 import matplotlib.pyplot as plt
 plt.plot(hist.history['loss'])
 plt.figure()
-plt.plot(hist.history['acc'])
-plt.plot(hist.history['val_acc'])
+plt.plot(hist.history['accuracy'])
+plt.plot(hist.history['val_accuracy'])
 
 '''
 Summary statistics
@@ -324,13 +324,15 @@ to_svm = feature[-1]
 to_svm_test = feature_test[-1]
 
 clf.fit(to_svm, Ytrain)
-print("Acc with an extra SVM: {}".format(accuracy_score(clf.predict(to_svm_test), Ytest)))
+pred_test_svm = clf.predict(to_svm_test)
+print("Acc with an extra SVM: {}".format(accuracy_score(pred_test_svm, Ytest)))
+print(confusion_matrix(Ytest, pred_test_svm) )
 
-from visual import CAM_on_input
-plt.figure()
-for i in range(4):
-#    ind=[3, 1, 2, 0]
-    plt.subplot(4,1,1+i)
-    CAM_on_input(Mymodel, -2, int(Ytrain[40*i]), X_train_transformed[40*i], -5)
-    plt.title('sample {}, True label {}, Pred label{}'.format(40*i, Ytrain[40*i], np.argmax(pred_train[40*i],-1)))
-    
+#from visual import CAM_on_input
+#plt.figure()
+#for i in range(4):
+##    ind=[3, 1, 2, 0]
+#    plt.subplot(4,1,1+i)
+#    CAM_on_input(Mymodel, -2, int(Ytrain[40*i]), X_train_transformed[40*i], -5)
+#    plt.title('sample {}, True label {}, Pred label{}'.format(40*i, Ytrain[40*i], np.argmax(pred_train[40*i],-1)))
+#    

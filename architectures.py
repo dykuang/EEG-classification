@@ -401,8 +401,9 @@ def My_eeg_net_1d(nb_classes, Chans = 64, Samples = 128,
 #    block1       = MaxPooling1D(8)(block1)
     block1       = dropoutType(dropoutRate)(block1)
     
-    block2       = SeparableConv1D(F2, 8,
-                                   use_bias = False, padding = 'same')(block1)
+    block2       = SeparableConv1D(F2, 8, use_bias = False,
+#                                   depthwise_constraint = max_norm(1.),
+                                   padding = 'same')(block1)
     block2       = BatchNormalization()(block2)
     block2       = Activation('elu')(block2)
     block2       = AveragePooling1D(4)(block2)
@@ -426,11 +427,11 @@ def My_eeg_net_1d(nb_classes, Chans = 64, Samples = 128,
     flatten      = Flatten(name = 'flatten')(block2)
 #    flatten      = GlobalAveragePooling1D()(block2)
     
-#    dense        = Dense(nb_classes, 
-#                         kernel_constraint = max_norm(norm_rate), activation = 'relu')(flatten)
+#    dense        = Dense(32, kernel_constraint = max_norm(norm_rate), name='feature', activation = 'elu')(flatten)
     
     dense        = Dense(nb_classes, name = 'dense', 
-                         kernel_constraint = max_norm(norm_rate))(flatten)
+                         kernel_constraint = max_norm(norm_rate)
+                         )(flatten)
     
 #    dense        = add([dense, dense1])
     softmax      = Activation(act, name = 'softmax')(dense)
@@ -561,7 +562,9 @@ def My_eeg_net_1d_w_CM(nb_classes, Chans = 64, Samples = 128,
                          'or Dropout, passed as a string.')
     
     input1   = Input(shape = (Samples, Chans)) 
-    input2   = Input(shape = (Chans, Chans, 15))
+#    input2   = Input(shape = (Chans, Chans, 1))
+#    input2   = Input(shape = (45,))
+    input2   = Input(shape = (19, 45))
     
     ##################################################################
     # The 1d branch
@@ -597,16 +600,42 @@ def My_eeg_net_1d_w_CM(nb_classes, Chans = 64, Samples = 128,
     #####################################################################
     # The 2d branch
     #####################################################################
-    block       = Conv2D(32, 3, padding= 'same', use_bias = False)(input2)
-    block       = BatchNormalization(axis = -1)(block)
-#    block       = Activation('elu')(block)
-    block       = DepthwiseConv2D(2, use_bias = False, 
-                                   depth_multiplier = 1,
-                                   depthwise_constraint = None)(block)
-    block       = Activation('elu')(block)
-    block       = AveragePooling2D((2, 2))(block)
+# =============================================================================
+#     block       = Conv2D(32, 3, padding= 'same', use_bias = False)(input2)
+#     block       = BatchNormalization(axis = -1)(block)
+# #    block       = Activation('elu')(block)
+#     block       = DepthwiseConv2D(2, use_bias = False, 
+#                                    depth_multiplier = 1,
+#                                    depthwise_constraint = None)(block)
+#     block       = Activation('elu')(block)
+#     block       = AveragePooling2D((2, 2))(block)
+#     
+#     block       = SeparableConv2D(64, 3, use_bias = False, 
+#                                    depth_multiplier = 2,
+#                                    depthwise_constraint = max_norm(1.))(block)
+#     block       = Activation('elu')(block)
+# #    block       = AveragePooling2D((2, 2))(block)
+#     block       = dropoutType(dropoutRate)(block)
+#         
+#     flatten2    = Flatten(name = 'flatten2')(block)
+# =============================================================================
+#    dense2      = Dense(16, activation='elu')(flatten2)     
     
-    block       = SeparableConv2D(64, 3, use_bias = False, 
+#    '''
+#    only the lower left info
+#    '''
+#    flatten2    = Dense(128, activation = 'elu')(input2)
+    
+    '''
+    if dcm
+    '''
+    block       = SeparableConv1D(64, 3, use_bias = False, 
+                                   depth_multiplier = 1,
+                                   depthwise_constraint = None)(input2)
+    block       = Activation('elu')(block)
+    block       = AveragePooling1D(3)(block)
+    
+    block       = SeparableConv1D(64, 3, use_bias = False, 
                                    depth_multiplier = 2,
                                    depthwise_constraint = max_norm(1.))(block)
     block       = Activation('elu')(block)
@@ -614,14 +643,15 @@ def My_eeg_net_1d_w_CM(nb_classes, Chans = 64, Samples = 128,
     block       = dropoutType(dropoutRate)(block)
         
     flatten2    = Flatten(name = 'flatten2')(block)
-#    dense2      = Dense(16, activation='elu')(flatten2)     
-    
-    
+
     ######################################################################
     # Merge to classify
     ######################################################################
     
     flatten      = concatenate([flatten1, flatten2])
+    
+#    dense        = Dense(32, name = 'feature', kernel_constraint = max_norm(norm_rate), activation='elu')(flatten)
+    
     dense        = Dense(nb_classes, name = 'dense', 
                          kernel_constraint = max_norm(norm_rate))(flatten)
     
