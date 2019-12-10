@@ -245,19 +245,37 @@ def Buterworth_batch(X, cut_off_freq = 0.2, order = 3):
     
     return X_smoothed
                        
-from scipy.signal import periodogram
-def power_spectrum_batch(X, freq=60):
+from scipy.signal import periodogram, welch
+def power_spectrum_batch(X, freq, use_welch=True):
     '''
     Get the powerspectrum of X: (samples, time, channels)
     '''   
     assert len(X.shape) == 3, "wrong input shape"
     S, T, C = X.shape  
-    Ps = np.empty((S,T//2+1, C))                     
-    for i in range(S):
-        for j in range(C):
-            _, Ps[i,:,j] = periodogram(X[i,:,j], freq,  detrend='constant', scaling='spectrum')
+#    Ps = np.empty((S,T//2+1, C))
+    if use_welch:
+        _, Ps = welch(X, freq,  detrend='constant', scaling='density', nperseg=2000, axis = 1)
+        
+    else:
+                         
+        _, Ps = periodogram(X, freq,  detrend='constant', scaling='density', axis = 1)
     
     return Ps**0.5
+
+
+def get_epdf(X, span, bins):
+    '''
+    Convert to emprical probability density esitimation of input X
+    '''
+    assert len(X.shape) == 3, "wrong input shape"
+    S, T, C = X.shape
+    density = np.empty([S, bins, C])
+    for i in range(S):
+        for j in range(C):
+            density[i,:,j] = np.histogram(X[i,:,j], bins, range=span, density=True)[0]
+    
+    return density
+
 
 
 def band_decompose(X, fs=400, bands={'Delta': (0, 4),

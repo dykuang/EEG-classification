@@ -124,6 +124,32 @@ def train(model, X, Y, num_steps, batchsize, check_point=100):
     return log    
     
 
-
-
+## ===================================================
+#  For evaluations
+## ======================================================
+def scores(CM):
+    '''
+    Calculate the accuracy, precision, recall, specificity and f1_score from confusion matrix
+    It returns a matrix with class labels as rows and scores above as columns
+    '''
+    n_classes = CM.shape[0]
+    scores = np.empty((n_classes, 5))
+    _sum = np.sum(CM)
+    col_sum = np.sum(CM, axis=0)
+    row_sum = np.sum(CM, axis=1)
+    TP = CM.diagonal()
+    scores[:,0] = TP/_sum # accuracy per class, sum up them for accuracy
+    scores[:,1] = TP/col_sum # precision per class
+    scores[:,2] = TP/row_sum  # recall per class 
+    scores[:,3] = (_sum-row_sum-col_sum+TP)/(_sum-row_sum)
+    scores[:,-1] = 2*(scores[:,1]*scores[:,2])/(scores[:,1]+scores[:,2]) # F1_score
+    
+    weight = row_sum/_sum
+    weighted_summary = np.array([np.sum(scores[:,0]),
+                                 np.dot(weight, scores[:,1]), 
+                                 np.dot(weight, scores[:,2]),
+                                 np.dot(weight, scores[:,3]),
+                                 np.dot(weight, scores[:,-1])])
+#    print(weight)
+    return scores, weighted_summary
 

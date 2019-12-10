@@ -1044,6 +1044,7 @@ class band_mask(Layer):
         assert isinstance(X, list)
         signal, attention = X
         signal_fft = tf.signal.rfft(tf.transpose(tf.cast(signal, 'float32'), (0,2,1)))
+        
         if self.mask_type == 'hard':
             cond = tf.greater(attention, tf.ones(tf.shape(attention))*self.thres)
             mask = tf.where(cond, tf.ones(tf.shape(attention)), tf.zeros(tf.shape(attention)))
@@ -1052,9 +1053,13 @@ class band_mask(Layer):
 
         else:
             signal_fft_masked = tf.multiply(signal_fft, tf.transpose(tf.cast(attention,'complex64'), (0,2,1)) ) 
- 
-        signal_rec = tf.signal.irfft(signal_fft_masked)
         
+#        PE = tf.reduce_sum(signal_fft**2, axis=-1, keepdims = True)
+#        PE_masked = tf.reduce_sum(signal_fft_masked**2, axis=-1, keepdims = True)
+#        
+#        signal_rec = tf.signal.irfft(signal_fft_masked * PE / PE_masked) 
+        
+        signal_rec = tf.signal.irfft(signal_fft_masked)
         
         return tf.transpose(signal_rec, (0, 2, 1))   
     
@@ -1087,6 +1092,56 @@ class F_series(Layer):
         const = coef[:,:1]
         
         return const + tf.reduce_sum(cos_part + sin_part, 1, keepdims=True)
+    
+class F_series_multichannel(Layer):
+    '''
+    For regressing R - R^C functions
+    '''
+    def __init__(self, interval_length, num_components, num_channels,**kwargs):
+        self.L = interval_length
+        self.N = num_components
+        self.C = num_channels
+        super(F_series_multichannel, self).__init__(**kwargs)
+        
+    def build(self, input_shape):
+        super(F_series_multichannel, self).build(input_shape)
+        
+    def compute_output_shape(self, input_shape):
+        assert isinstance(input_shape, list)
+        shape_coef, shape_x = input_shape
+        return (shape_coef[0], 1, self.C) 
+    
+    def call(self, X):
+        assert isinstance(X, list)
+        coef, x = X  # coef: (batchsize, N, C)
+        angles = tf.range(1, 1+self.N)
+        angles = tf.cast(angles, 'float32')
+
+        Pi = tf.constant(3.1415926, 'float32')
+        omega = 2.0*Pi*angles/self.L
+        omega = tf.reshape(omega, (1, -1)) # (1,N)
+        
+        phase = tf.matmul(x, omega) # (batchsize, N)
+#        phase = tf.expand_dims(phase, 2)
+        phase = tf.reshape(tf.tile(phase, [1,self.C]), [-1, self.N, self.C])
+
+        
+#        cos_part = []
+#        sin_part = []
+#        for i in range(self.C):
+#            cos_part.append(coef[:,1:1+self.N, i]*tf.math.cos(phase))
+#            sin_part.append(coef[:,1+self.N:, i]*tf.math.sin(phase))
+#        
+#        cos_part = tf.concat(cos_part)    
+#        sin_part = tf.concat(sin_part)  
+        print(tf.shape(coef))
+        cos_part = coef[:,1:1+self.N,:]*tf.math.cos(phase)
+        sin_part = coef[:,1+self.N:,:]*tf.math.sin(phase)        
+        const = coef[:,:1, :]
+        
+        return const + tf.reduce_sum(cos_part + sin_part, 1, keepdims=True)
+    
+
     
 import keras.backend as K
 class Get_gradient(Layer):
