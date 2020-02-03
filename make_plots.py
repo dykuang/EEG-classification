@@ -128,20 +128,40 @@ e = zscore(E[0])
 t = np.arange(0, 23.6, 1/173.61)[:-1]
 plt.figure()
 plt.subplot(3,1,1)
-plt.plot(t, b, 'b', alpha=0.8)
+plt.plot(t, b, alpha=0.8)
 plt.ylim([-3,5])
 plt.grid()
-plt.title('Healthy')
+#plt.title('Healthy')
 plt.subplot(3,1,2)
-plt.plot(t, d, 'k', alpha=0.8)
+plt.plot(t, d, 'darkorange',alpha=0.8)
 plt.ylim([-3,5])
 plt.grid()
-plt.title('Preictal')
+#plt.title('Preictal')
 plt.subplot(3,1,3)
-plt.plot(t, e, 'r', alpha=0.8)
+plt.plot(t, e, 'g', alpha=0.8)
 plt.ylim([-3,5])
 plt.grid()
-plt.title('Seizure')
+#plt.title('Seizure')
+
+from scipy.signal import periodogram
+plt.figure()
+f_S1, p_S1=periodogram(b, fs=173.61, window=None, nfft=None, 
+                       detrend='constant', return_onesided=True, scaling='density', 
+                       axis=0)
+plt.plot(f_S1, p_S1, label='Helathy')
+f_S1, p_S1=periodogram(d, fs=173.61, window=None, nfft=None, 
+                       detrend='constant', return_onesided=True, scaling='density', 
+                       axis=0)
+plt.plot(f_S1, p_S1, label='Preictal')
+f_S1, p_S1=periodogram(e, fs=173.61, window=None, nfft=None, 
+                       detrend='constant', return_onesided=True, scaling='density', 
+                       axis=0)
+plt.plot(f_S1, p_S1, label='Seizure')
+plt.xlabel('Frequency(Hz)')      
+plt.xlim(0,40)
+plt.ylabel('V**2/Hz')
+plt.legend()
+
 
 
 base_cm = np.load('baseCM.npy')
@@ -161,3 +181,52 @@ score_bar([base[:,-1],comp[:,-1]],
           ['Healthy', 'Preictal', 'Seizure'], 
           ['Baseline','Ours'], ylim=[0.8, 1.0], width=0.25, 
           figsize=(15,8))
+
+
+# performance with different bandpassed filter
+
+'''
+BCI-dataset 3
+'''
+high_cut = np.array([199.99, 99.99, 49.99, 24.99, 12.99, 6.99])
+S1_train = np.array([99.38, 99.38, 98.75, 98.75, 100, 63.75]) 
+S1_test = np.array([68.92, 67.57, 67.57, 68.92, 60.81, 16.22])
+S2_train = np.array([94.38, 93.13,93.13,95.00, 93.13, 65.63]) 
+S2_test = np.array([47.95,46.57,47.95,46.57,46.57,21.92])
+
+plt.figure()
+plt.plot(high_cut, S1_train, '-^',label='S1_train')
+plt.plot(high_cut, S1_test, '-^', label='S1_test')
+plt.plot(high_cut, S2_train, '-^', label='S2_train')
+plt.plot(high_cut, S2_test, '-^', label='S2_test')
+
+plt.xlim(200, 0)
+plt.grid()
+plt.legend(['S1_train', 'S1_test', 'S2_train', 'S2_test'])
+plt.ylabel('Accuracy (%)')
+plt.xlabel('Upper bound of frequency kept (Hz)')
+
+'''
+Bonn
+'''
+
+high_cut = np.array([0.5, 0.25, 0.125, 1/16.0])*173.61
+H = np.array([42, 42, 31, 20])/44*100
+P = np.array([37, 35, 37, 28])/39*100
+S = np.array([33, 33, 22, 2])/37*100
+
+plt.figure()
+plt.plot(high_cut, H, '-^',label='Healthy')
+plt.plot(high_cut, P, '-^',label='Preictal')
+plt.plot(high_cut, S, '-^',label='Seizure')
+
+plt.xlim(100, 0)
+plt.grid()
+plt.legend()
+plt.ylabel('Accuracy (%)')
+plt.xlabel('Upper bound of frequency kept (Hz)')
+
+
+
+
+

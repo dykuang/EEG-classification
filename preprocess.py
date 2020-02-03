@@ -246,7 +246,7 @@ def Buterworth_batch(X, cut_off_freq = 0.2, order = 3):
     return X_smoothed
                        
 from scipy.signal import periodogram, welch
-def power_spectrum_batch(X, freq, use_welch=True):
+def power_spectrum_batch(X, freq, use_welch=True, nseg=128):
     '''
     Get the powerspectrum of X: (samples, time, channels)
     '''   
@@ -254,7 +254,7 @@ def power_spectrum_batch(X, freq, use_welch=True):
     S, T, C = X.shape  
 #    Ps = np.empty((S,T//2+1, C))
     if use_welch:
-        _, Ps = welch(X, freq,  detrend='constant', scaling='density', nperseg=2000, axis = 1)
+        _, Ps = welch(X, freq,  detrend='constant', scaling='density', nperseg=nseg, axis = 1)
         
     else:
                          
@@ -361,7 +361,48 @@ def to_tsfresh_df(X):
     X_DF['time'] = time
     
     return X_DF
+
+
+'''
+bandpass filter, copied from 
+https://users.soe.ucsc.edu/~karplus/bme51/w17/bandpass-filter.py
+''' 
+   
+def band_pass(values, low_end_cutoff, high_end_cutoff, sampling_freq):
+    # The band-pass filter will pass signals with frequencies between
+    # low_end_cutoff and high_end_cutoff
+    lo_end_over_Nyquist = low_end_cutoff/(0.5*sampling_freq)
+    hi_end_over_Nyquist = high_end_cutoff/(0.5*sampling_freq)
     
+    # If the bandpass filter gets ridiculously large output values (1E6 or more),
+    # the problem is numerical instability of the filter (probably from using a
+    # high sampling rate).  
+    # The problem can be addressed by reducing the order of the filter (first argument) from 5 to 2.
+    bess_b,bess_a = signal.iirfilter(5,
+                Wn=[lo_end_over_Nyquist,hi_end_over_Nyquist],
+                btype="bandpass", ftype='bessel')
+    bandpass = signal.filtfilt(bess_b,bess_a,values)
+    
+# =============================================================================
+#     # The low-pass filter will pass signals with frequencies
+#     # below low_end_cutoff
+#     bess_b,bess_a = scipy.signal.iirfilter(5, Wn=[lo_end_over_Nyquist],
+#                 btype="lowpass", ftype='bessel')
+#     lowpass = scipy.signal.filtfilt(bess_b,bess_a,values)
+# =============================================================================
+    
+    return bandpass
+
+def batch_band_pass(values, low_end_cutoff, high_end_cutoff, sampling_freq):
+    assert len(values.shape) == 3, "wrong input shape"
+    S, T, C = values.shape
+    X_filtered = np.empty(values.shape)
+    for i in range(S):
+        for j in range(C):
+            X_filtered[i,:,j] = band_pass(values[i,:,j], low_end_cutoff, high_end_cutoff, sampling_freq)
+    
+    return X_filtered
+
 '''
 Some visualization
 '''
