@@ -31,44 +31,44 @@ plt.figure()
 plt.subplot(4,2,1)
 plt.plot(t, S1_sample[0][:,0], 'b')
 plt.xticks([])
-plt.title('S1-Left')
+plt.title('S1-Right')
 plt.grid()
 plt.subplot(4,2,2)
 plt.plot(t, S2_sample[0][:,0], 'b')
-plt.title('S2-Left')
+plt.title('S2-Right')
 plt.xticks([])
 plt.grid()
 
 plt.subplot(4,2,3)
 plt.plot(t, S1_sample[1][:,0], 'g')
-plt.title('S1-Right')
+plt.title('S1-Forward')
 plt.xticks([])
 plt.grid()
 plt.subplot(4,2,4)
 plt.plot(t,S2_sample[1][:,0], 'g')
-plt.title('S2-Right')
+plt.title('S2-Forward')
 plt.xticks([])
 plt.grid()
 
 plt.subplot(4,2,5)
 plt.plot(t,S1_sample[2][:,0], 'k')
-plt.title('S1-Away')
+plt.title('S1-Left')
 plt.xticks([])
 plt.grid()
 plt.subplot(4,2,6)
 plt.plot(t,S2_sample[2][:,0], 'k')
-plt.title('S2-Away')
+plt.title('S2-Left')
 plt.xticks([])
 plt.grid()
 
 plt.subplot(4,2,7)
 plt.plot(t,S1_sample[3][:,0], 'r')
-plt.title('S1-Towards')
+plt.title('S1-Backward')
 plt.xticks([])
 plt.grid()
 plt.subplot(4,2,8)
 plt.plot(t,S2_sample[3][:,0], 'r')
-plt.title('S2-Towards')
+plt.title('S2-Backward')
 plt.xticks([])
 plt.grid()
 
@@ -83,7 +83,7 @@ s2_D = np.load('S2_D_new.npy')
 data = [s1_s, s1_D, s2_s, s2_D]
 # plot the confusion matrix
 for cm in data:
-    plot_confusion_matrix(np.sum(cm, axis=0),['L','R','A','T'])
+    plot_confusion_matrix(np.sum(cm, axis=0),['R','F','L','B'])
 
 summary = []
 
@@ -98,13 +98,13 @@ for cm in data:
 
 score_bar([summary[0][:,-1], summary[1][:,-1]], 
           ['k', 'r'], 
-          ['L','R','A','T'], 
+          ['R','F','L','B'], 
           ['Single','Dual'], ylim=[0.6, 0.8], width=0.25, 
           figsize=(15,8))
 
 score_bar([summary[2][:,-1], summary[3][:,-1]], 
           ['k', 'r'], 
-          ['L','R','A','T'], 
+          ['R','F','L','B'], 
           ['Single','Dual'], ylim=[0.2, 0.6], width=0.25, 
           figsize=(15,8))
 

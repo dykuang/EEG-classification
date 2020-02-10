@@ -30,8 +30,8 @@ Params = {
         'cut_off freq': 0.1,
         'num downsampling': None,
         'low cut': 0.01,
-        'high cut': 173.6/2,
-        'sampling freq': 173.61  # 173.61 for Bonn, 400 for BCI-dataset 3
+        'high cut': 199.99,
+        'sampling freq': 400  # 173.61 for Bonn, 400 for BCI-dataset 3
         }
 
 '''
@@ -51,13 +51,13 @@ Load data
 #Ytest = np.load(r'../Ytest1.npy')
 
 # ============== BCI-IV-set 3 ======================================
-#dataset = 'D:/EEG/archive/BCI-IV-dataset3/'
-#subject = 1
-#Xtrain = np.load(dataset+r'S{}train.npy'.format(subject))
-#Xtest = np.load(dataset+r'S{}test.npy'.format(subject))
-#Ytrain = np.load(dataset+r'Ytrain.npy'.format(subject))
-#Ytest = np.load(dataset+r'S{}Ytest.npy'.format(subject))[0]
-#
+dataset = 'D:/EEG/archive/BCI-IV-dataset3/'
+subject = 1
+Xtrain = np.load(dataset+r'S{}train.npy'.format(subject))
+Xtest = np.load(dataset+r'S{}test.npy'.format(subject))
+Ytrain = np.load(dataset+r'Ytrain.npy'.format(subject))
+Ytest = np.load(dataset+r'S{}Ytest.npy'.format(subject))[0]
+
 #Xtrain = np.load('D:/EEG/archive/extra_data/re_train.npy')
 #Xtest = np.load('D:/EEG/archive/extra_data/re_test.npy')
 
@@ -107,40 +107,42 @@ Load data
 #========= Bonn ==================================
 # Can do a binary classification
 #===================================================
-dataset = 'D:/EEG/archive/Bonn/'
-#H = np.load(dataset + 'Z.npy')[...,None]
-#Y_H = np.zeros(len(H))
-#U = np.load(dataset + 'N.npy')[...,None]
-#Y_U = np.ones(len(U))
-##Y_U = np.zeros(len(U))
-#S = np.load(dataset + 'Se.npy')
-#Y_S = 2*np.ones(len(S))
-##Y_S = np.ones(len(S))
-
-#X = np.vstack([H,U,S])
-#Y = np.hstack([Y_H,Y_U,Y_S])
-
-A = np.load(dataset + 'Z.npy')[...,None] ## healthy, eyes open
-B = np.load(dataset + 'O.npy')[...,None] ## healthy, eyes closed
-C = np.load(dataset + 'N.npy')[...,None] ## unhealthy, seizure free, not onsite
-D = np.load(dataset + 'F.npy')[...,None] ## unhealthy, seizure free, onsite
-E = np.load(dataset + 'S.npy')[...,None] ## unhealthy, seizure
-
-#A = np.stack([A[:,i*400:(i+1)*400,:] for i in range(10)], axis=-1)[...,0,:]
-#B = np.stack([B[:,i*400:(i+1)*400,:] for i in range(10)], axis=-1)[...,0,:]
-#C = np.stack([C[:,i*400:(i+1)*400,:] for i in range(10)], axis=-1)[...,0,:]
-#D = np.stack([D[:,i*400:(i+1)*400,:] for i in range(10)], axis=-1)[...,0,:]
-#E = np.stack([E[:,i*400:(i+1)*400,:] for i in range(10)], axis=-1)[...,0,:]
-
-#X = np.vstack([A,B,C,D,E])
-#Y = np.hstack([np.zeros(len(A)),np.ones(len(B)),2*np.ones(len(C)),3*np.ones(len(D)),4*np.ones(len(E))])
-
-X = np.vstack([B, D, E])
-Y = np.hstack([np.zeros(len(B)),np.ones(len(D)), 2*np.ones(len(E))])
-
-from sklearn.model_selection import train_test_split
-Xtrain, Xtest, Ytrain, Ytest = train_test_split(
-                                X, Y, test_size=0.4, random_state=42)
+# =============================================================================
+# dataset = 'D:/EEG/archive/Bonn/'
+# #H = np.load(dataset + 'Z.npy')[...,None]
+# #Y_H = np.zeros(len(H))
+# #U = np.load(dataset + 'N.npy')[...,None]
+# #Y_U = np.ones(len(U))
+# ##Y_U = np.zeros(len(U))
+# #S = np.load(dataset + 'Se.npy')
+# #Y_S = 2*np.ones(len(S))
+# ##Y_S = np.ones(len(S))
+# 
+# #X = np.vstack([H,U,S])
+# #Y = np.hstack([Y_H,Y_U,Y_S])
+# 
+# A = np.load(dataset + 'Z.npy')[...,None] ## healthy, eyes open
+# B = np.load(dataset + 'O.npy')[...,None] ## healthy, eyes closed
+# C = np.load(dataset + 'N.npy')[...,None] ## unhealthy, seizure free, not onsite
+# D = np.load(dataset + 'F.npy')[...,None] ## unhealthy, seizure free, onsite
+# E = np.load(dataset + 'S.npy')[...,None] ## unhealthy, seizure
+# 
+# #A = np.stack([A[:,i*400:(i+1)*400,:] for i in range(10)], axis=-1)[...,0,:]
+# #B = np.stack([B[:,i*400:(i+1)*400,:] for i in range(10)], axis=-1)[...,0,:]
+# #C = np.stack([C[:,i*400:(i+1)*400,:] for i in range(10)], axis=-1)[...,0,:]
+# #D = np.stack([D[:,i*400:(i+1)*400,:] for i in range(10)], axis=-1)[...,0,:]
+# #E = np.stack([E[:,i*400:(i+1)*400,:] for i in range(10)], axis=-1)[...,0,:]
+# 
+# #X = np.vstack([A,B,C,D,E])
+# #Y = np.hstack([np.zeros(len(A)),np.ones(len(B)),2*np.ones(len(C)),3*np.ones(len(D)),4*np.ones(len(E))])
+# 
+# X = np.vstack([B, D, E])
+# Y = np.hstack([np.zeros(len(B)),np.ones(len(D)), 2*np.ones(len(E))])
+# 
+# from sklearn.model_selection import train_test_split
+# Xtrain, Xtest, Ytrain, Ytest = train_test_split(
+#                                 X, Y, test_size=0.4, random_state=42)
+# =============================================================================
 '''
 Normalize data
 '''
@@ -152,8 +154,8 @@ from preprocess import normalize_in_time, normalize_samples, rolling_max, normal
 #X_train_transformed = Buterworth_batch(Xtrain, cut_off_freq = Params['cut_off freq']) # use this for non-smooth data
 #X_test_transformed = Buterworth_batch(Xtest, cut_off_freq = Params['cut_off freq'])
 
-Xtrain =  batch_band_pass(Xtrain, Params['low cut'], Params['high cut'], Params['sampling freq'])
-Xtest =  batch_band_pass(Xtest, Params['low cut'], Params['high cut'], Params['sampling freq'])
+#Xtrain =  batch_band_pass(Xtrain, Params['low cut'], Params['high cut'], Params['sampling freq'])
+#Xtest =  batch_band_pass(Xtest, Params['low cut'], Params['high cut'], Params['sampling freq'])
        
 from scipy.stats import zscore
 
@@ -404,7 +406,7 @@ import keras.backend as K
 from vis.visualization import visualize_activation
 
 if Params['n classes'] == 4:
-    label_list = ['Moving Left', 'Moving Right', 'Moving away', 'Moving closer']
+    label_list = ['Right', 'Forward', 'Left', 'Backward']
     seed_list = [0,40,80,120] # for the BCI dataset IV
 elif Params['n classes'] == 3:
     seed_list = [np.where(Ytrain==i)[0][0] for i in range(3)]
@@ -414,88 +416,89 @@ from scipy.signal import periodogram
 
 # ==================== For the Bonn set ===================================================
 # =============================================================================
-fig, ax= plt.subplots(Params['n classes'],1)
-fig_1, ax_1= plt.subplots(Params['n classes'],1)
-
-for i in range(Params['n classes']):
- #    plt.subplot(Params['n classes'],1,1+i)
-     _min = np.amin(X_train_transformed[seed_list[i]])
-     _max = np.amax(X_train_transformed[seed_list[i]])
-     a=visualize_activation(Mymodel, -2, i, seed_input=X_train_transformed[seed_list[i]], 
-                            backprop_modifier='relu', input_range=(_min,_max),
-                            input_modifiers=None, max_iter = 1000)
- #    ax[i].plot( (a[:,3]-np.min(a[:,3]))/(np.max(a[:,3])-np.min(a[:,3])) , 'r')
-     ax[i].plot(np.linspace(0,23.6,4097),a[:,0] )
-     ax[i].yaxis.grid(True)
-     ax[i].set_ylabel('{}'.format(label_list[i]))
-     
-     f_S1, p_S1=periodogram(a, fs=Params['sampling freq'], window=None, nfft=None, 
-                            detrend='constant', return_onesided=True, scaling='density', 
-                            axis=0)
-     ax_1[i].plot(f_S1, p_S1)
-     ax_1[i].xaxis.grid(True)
-     
-     if i < Params['n classes']-1:
-        ax_1[i].set_xticklabels([])
-        ax[i].set_xticklabels([])
-     else:
-        ax_1[i].set_xlabel('Frequency(Hz)')
-        ax[i].set_xlabel('Time(s)')
-        
-     ax_1[i].set_xlim(0,40)
-     ax_1[i].set_ylabel('V**2/Hz \n  {}'.format(label_list[i]))
-
-fig.tight_layout()
-fig_1.tight_layout()
-plt.subplots_adjust(wspace=0, hspace=0) 
-plt.subplots_adjust(wspace=0, hspace=0)    
+#fig, ax= plt.subplots(Params['n classes'],1)
+#fig_1, ax_1= plt.subplots(Params['n classes'],1)
+#
+#for i in range(Params['n classes']):
+# #    plt.subplot(Params['n classes'],1,1+i)
+#     _min = np.amin(X_train_transformed[seed_list[i]])
+#     _max = np.amax(X_train_transformed[seed_list[i]])
+#     a=visualize_activation(Mymodel, -2, i, seed_input=X_train_transformed[seed_list[i]], 
+#                            backprop_modifier='relu', input_range=(_min,_max),
+#                            input_modifiers=None, max_iter = 1000)
+# #    ax[i].plot( (a[:,3]-np.min(a[:,3]))/(np.max(a[:,3])-np.min(a[:,3])) , 'r')
+#     ax[i].plot(np.linspace(0,23.6,4097),a[:,0] )
+#     ax[i].yaxis.grid(True)
+#     ax[i].set_ylabel('{}'.format(label_list[i]))
+#     
+#     f_S1, p_S1=periodogram(a, fs=Params['sampling freq'], window=None, nfft=None, 
+#                            detrend='constant', return_onesided=True, scaling='density', 
+#                            axis=0)
+#     ax_1[i].plot(f_S1, p_S1)
+#     ax_1[i].xaxis.grid(True)
+#     
+#     if i < Params['n classes']-1:
+#        ax_1[i].set_xticklabels([])
+#        ax[i].set_xticklabels([])
+#     else:
+#        ax_1[i].set_xlabel('Frequency(Hz)')
+#        ax[i].set_xlabel('Time(s)')
+#        
+#     ax_1[i].set_xlim(0,40)
+#     ax_1[i].set_ylabel('$V^2$/Hz \n  {}'.format(label_list[i]))
+#
+#fig.tight_layout()
+#fig_1.tight_layout()
+#plt.subplots_adjust(wspace=0, hspace=0) 
+#plt.subplots_adjust(wspace=0, hspace=0)    
 # =============================================================================
 
 
 
 # ======================For the BCI-3 set=======================================================
-#fig, ax= plt.subplots(Params['n classes'],2)
-#fig_1, ax_1= plt.subplots(Params['n classes'],1)
-#
-#for i in range(Params['n classes']):
-# #    plt.subplot(Params['n classes'],1,1+i)
-#    _min = np.amin(X_train_transformed[seed_list[i]])
-#    _max = np.amax(X_train_transformed[seed_list[i]])
-#    a=visualize_activation(Mymodel, -2, i, seed_input=X_train_transformed[seed_list[i]], 
-#                           backprop_modifier='relu', input_range=(_min,_max),
-#                           input_modifiers=None,
-#                           #max_iter = 1000
-#                           )
-#    ax[i][0].plot( a )
-#    ax[i][0].yaxis.grid(True)
-#    ax[i][0].set_ylabel(label_list[i])
-#    ax[i][1].plot( a[:,3] , 'r')
-#    ax[i][1].yaxis.grid(True)
-#    ax[i][1].set_yticklabels([])
-#    
-#    f_S1, p_S1=periodogram(a, fs='sampling freq', window=None, nfft=None, 
-#              detrend='constant', return_onesided=True, scaling='density', 
-#              axis=0)
-#    ax_1[i].plot(f_S1, p_S1)
-#    ax_1[i].xaxis.grid(True)
-#    if i < Params['n classes']-1:
-#        ax_1[i].set_xticklabels([])
-#    else:
-#        ax_1[i].set_xlabel('Frequency(Hz)')
-#    
-#    ax_1[i].set_xlim(0,25)
-#    ax_1[i].set_ylabel('V**2/Hz \n  {}'.format(label_list[i]))
-#
-#     
-# 
-#fig.legend(["channel {}".format(i) for i in range(10)], loc='center left', 
-#             borderpad=1.5, labelspacing=1.5, fontsize = 'xx-large')
-#fig.tight_layout()
-#plt.subplots_adjust(wspace=0, hspace=0)
-#
-##ax_1[0].legend(['channel {}'.format(i) for i in range(9)])
-#fig_1.legend(['channel {}'.format(i) for i in range(10)],loc='center right', ncol = 2)
-#fig_1.tight_layout()
-#plt.subplots_adjust(wspace=0, hspace=0)
+fig, ax= plt.subplots(Params['n classes'],2)
+fig_1, ax_1= plt.subplots(Params['n classes'],1)
+
+for i in range(Params['n classes']):
+ #    plt.subplot(Params['n classes'],1,1+i)
+    _min = np.amin(X_train_transformed[seed_list[i]])
+    _max = np.amax(X_train_transformed[seed_list[i]])
+    a=visualize_activation(Mymodel, -2, i, seed_input=X_train_transformed[seed_list[i]], 
+                           backprop_modifier='relu', input_range=(_min,_max),
+                           input_modifiers=None,
+#                           max_iter = 1000
+                           )
+    ax[i][0].plot( np.linspace(0,1,400), a )
+    ax[i][0].yaxis.grid(True)
+    ax[i][0].set_ylabel(label_list[i])
+    ax[i][1].plot(np.linspace(0,1,400), a[:,3] , 'r')
+    ax[i][1].yaxis.grid(True)
+    ax[i][1].set_yticklabels([])
+    
+    f_S1, p_S1=periodogram(a, fs=Params['sampling freq'], window=None, nfft=None, 
+              detrend='constant', return_onesided=True, scaling='density', 
+              axis=0)
+    ax_1[i].plot(f_S1, p_S1)
+    ax_1[i].xaxis.grid(True)
+    if i < Params['n classes']-1:
+        ax_1[i].set_xticklabels([])
+    else:
+        ax_1[i].set_xlabel('Frequency(Hz)')
+    
+    ax_1[i].set_xlim(0,25)
+    ax_1[i].set_ylabel('$V^2$/Hz \n  {}'.format(label_list[i]))
+
+     
+ax[i][0].set_xlabel('Time (s)')
+ax[i][1].set_xlabel('Time (s)') 
+fig.legend(["channel {}".format(i) for i in range(10)], loc='center left', 
+             borderpad=1.0, labelspacing=1.0, fontsize = 'x-large')
+fig.tight_layout()
+plt.subplots_adjust(wspace=0, hspace=0)
+
+#ax_1[0].legend(['channel {}'.format(i) for i in range(9)])
+fig_1.legend(['channel {}'.format(i) for i in range(10)],loc='center right', ncol = 2)
+fig_1.tight_layout()
+plt.subplots_adjust(wspace=0, hspace=0)
 
 # =============================================================================
