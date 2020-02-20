@@ -31,44 +31,44 @@ plt.figure()
 plt.subplot(4,2,1)
 plt.plot(t, S1_sample[0][:,0], 'b')
 plt.xticks([])
-plt.title('S1-Right')
+plt.title('S1-Left')
 plt.grid()
 plt.subplot(4,2,2)
 plt.plot(t, S2_sample[0][:,0], 'b')
-plt.title('S2-Right')
+plt.title('S2-Left')
 plt.xticks([])
 plt.grid()
 
 plt.subplot(4,2,3)
 plt.plot(t, S1_sample[1][:,0], 'g')
-plt.title('S1-Forward')
+plt.title('S1-Right')
 plt.xticks([])
 plt.grid()
 plt.subplot(4,2,4)
 plt.plot(t,S2_sample[1][:,0], 'g')
-plt.title('S2-Forward')
+plt.title('S2-Right')
 plt.xticks([])
 plt.grid()
 
 plt.subplot(4,2,5)
 plt.plot(t,S1_sample[2][:,0], 'k')
-plt.title('S1-Left')
+plt.title('S1-Away')
 plt.xticks([])
 plt.grid()
 plt.subplot(4,2,6)
 plt.plot(t,S2_sample[2][:,0], 'k')
-plt.title('S2-Left')
+plt.title('S2-Away')
 plt.xticks([])
 plt.grid()
 
 plt.subplot(4,2,7)
 plt.plot(t,S1_sample[3][:,0], 'r')
-plt.title('S1-Backward')
+plt.title('S1-Towards')
 plt.xticks([])
 plt.grid()
 plt.subplot(4,2,8)
 plt.plot(t,S2_sample[3][:,0], 'r')
-plt.title('S2-Backward')
+plt.title('S2-Towards')
 plt.xticks([])
 plt.grid()
 
@@ -83,7 +83,7 @@ s2_D = np.load('S2_D_new.npy')
 data = [s1_s, s1_D, s2_s, s2_D]
 # plot the confusion matrix
 for cm in data:
-    plot_confusion_matrix(np.sum(cm, axis=0),['R','F','L','B'])
+    plot_confusion_matrix(np.sum(cm, axis=0),['L','R','A','T'])
 
 summary = []
 
@@ -98,13 +98,13 @@ for cm in data:
 
 score_bar([summary[0][:,-1], summary[1][:,-1]], 
           ['k', 'r'], 
-          ['R','F','L','B'], 
+          ['L','R','A','T'], 
           ['Single','Dual'], ylim=[0.6, 0.8], width=0.25, 
           figsize=(15,8))
 
 score_bar([summary[2][:,-1], summary[3][:,-1]], 
           ['k', 'r'], 
-          ['R','F','L','B'], 
+          ['L','R','A','T'], 
           ['Single','Dual'], ylim=[0.2, 0.6], width=0.25, 
           figsize=(15,8))
 
@@ -225,6 +225,94 @@ plt.grid()
 plt.legend()
 plt.ylabel('Accuracy (%)')
 plt.xlabel('Upper bound of frequency kept (Hz)')
+
+
+
+'''
+fNIRs
+'''
+s = np.empty((30,5))
+s99 = np.empty((30, 5))
+s99_nobc = np.empty((30, 5))
+
+from scipy.io import loadmat
+dataset = 'C:/Users/dykua/matlab projects/BCI/'
+sample = loadmat(dataset + 'x01.mat')['x'].transpose((2,0,1))
+sample_m99 = loadmat(dataset + 'x01_m99.mat')['x'].transpose((2,0,1))
+sample_m99_nobc = loadmat(dataset + 'x01_m99_nobc.mat')['x'].transpose((2,0,1))
+
+plt.figure()
+plt.plot(np.arange(347)/13.333, sample[0,:,0], label='Filtered, baseline corrected')
+plt.plot(np.arange(347)/13.333, sample_m99[0,:,0], label='Unfiltered, baseline corrected')
+plt.plot(np.arange(347)/13.333, sample_m99_nobc[0,:,0], label='Unfiltered and no baseline correction')
+plt.legend()
+plt.xlabel('Time (s)')
+
+for i in range(1, 31):
+    eva = np.load('Eval-S{:02d}.npy'.format(i))
+    eva99 = np.load('Eval-S{:02d}-m99.npy'.format(i))
+    eva99_nobc = np.load('Eval-S{:02d}-m99-nobc.npy'.format(i))
+    s[i-1] = eva[:,0]
+    s99[i-1] = eva99[:,0]
+    s99_nobc[i-1] = eva99_nobc[:,0]
+    
+print('Summary accuracy: mean: {} \n std:{} \n'.format(np.mean(s), np.std(np.mean(s,1))))
+print('Summary accuracy m99: mean: {} \n std:{} \n'.format(np.mean(s99), np.std(np.mean(s99,1)))) 
+print('Summary accuracy m99_nobc: mean: {} \n std:{} \n'.format(np.mean(s99_nobc), np.std(np.mean(s99_nobc,1)))) 
+# plt.boxplot(s.transpose(), notch=False, whis=1.5, bootstrap=2000)
+
+
+'''
+Paired t-test 
+'''
+from scipy.stat import ttest_rel, ttest_ind
+ttest_rel(np.mean(s, 1), np.mean(s99, 1))
+ttest_rel(np.mean(s, 1), np.mean(s99_nobc, 1))
+ttest_rel(np.mean(s99, 1), np.mean(s99_nobc, 1))
+
+
+plt.figure()
+plt.bar(range(1,31), np.mean(s, 1)*100, yerr= np.std(s, 1)*100,align='center', alpha=0.9, ecolor='black', capsize=2)
+plt.bar(range(31,32), np.mean(s)*100, yerr= np.std(np.mean(s, 1))*100,align='center', alpha=0.9, ecolor='black', capsize=2)
+plt.plot(range(32), 100*np.mean(s)*np.ones(32), '--')
+plt.plot(range(32), 100*(np.mean(s)*np.ones(32) + np.std(np.mean(s,1))), 'g--')
+plt.plot(range(32), 100*(np.mean(s)*np.ones(32) - np.std(np.mean(s,1))), 'g--')
+plt.plot(range(32), 70.4*np.ones(32), 'r--')
+plt.xlabel('Volunteers')
+plt.ylabel('Accuracy (%)')
+plt.text(0, 100, 'Grand mean: {:.02f}$\pm${:.02f}'.format(100*np.mean(s), 100*np.std(np.mean(s,1))))
+plt.title('With filtered and baseline corrected data.')
+
+plt.figure()
+plt.bar(range(1,31), np.mean(s99, 1)*100, yerr= np.std(s99, 1)*100,align='center', alpha=0.9, ecolor='black', capsize=2)
+plt.bar(range(31,32), np.mean(s99)*100, yerr= np.std(np.mean(s99, 1))*100,align='center', alpha=0.9, ecolor='black', capsize=2)
+plt.plot(range(32), 100*np.mean(s99)*np.ones(32), '--')
+plt.plot(range(32), 100*(np.mean(s99)*np.ones(32) + np.std(np.mean(s99,1))), 'g--')
+plt.plot(range(32), 100*(np.mean(s99)*np.ones(32) - np.std(np.mean(s99,1))), 'g--')
+plt.plot(range(32), 70.4*np.ones(32), 'r--')
+plt.xlabel('Volunteers')
+plt.ylabel('Accuracy (%)')
+plt.text(0, 100, 'Grand mean: {:.02f}$\pm${:.02f}'.format(100*np.mean(s99), 100*np.std(np.mean(s99,1))))
+plt.title('With unfiltered but baseline corrected data.')
+
+plt.figure()
+plt.bar(range(1,31), np.mean(s99_nobc, 1)*100, yerr= np.std(s99_nobc, 1)*100,align='center', alpha=0.9, ecolor='black', capsize=2)
+plt.bar(range(31,32), np.mean(s99_nobc)*100, yerr= np.std(np.mean(s99_nobc, 1))*100,align='center', alpha=0.9, ecolor='black', capsize=2)
+plt.plot(range(32), 100*np.mean(s99_nobc)*np.ones(32), '--')
+plt.plot(range(32), 100*(np.mean(s99_nobc)*np.ones(32) + np.std(np.mean(s99_nobc,1))), 'g--')
+plt.plot(range(32), 100*(np.mean(s99_nobc)*np.ones(32) - np.std(np.mean(s99_nobc,1))), 'g--')
+plt.plot(range(32), 70.4*np.ones(32), 'r--')
+plt.text(0, 100, 'Grand mean: {:.02f}$\pm${:.02f}'.format(100*np.mean(s99_nobc), 100*np.std(np.mean(s99_nobc,1))))
+plt.title('With unfiltered and uncorrected data.')
+plt.xlabel('Volunteers')
+plt.ylabel('Accuracy (%)')
+
+# plt.savefig('fnirs-eval', dpi=600, format='eps')
+    
+    
+
+    
+
 
 
 
