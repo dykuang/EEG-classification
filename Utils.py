@@ -102,7 +102,28 @@ def generator_freq(X, Y, batchsize, bandwidth = 30, dist_to_end = 50, freq = 5):
             X_gen = np.fft.irfft(X_fft, axis=1)                             
         
         yield [ X_gen, Y_gen.toarray()]
+        
 
+from preprocess import batch_band_pass
+def generator_filter(X, Y, batchsize, min_freq_cut, max_freq_cut, samplingfreq, strength=0.5):
+    '''
+    augment input with low pass filter
+    '''  
+    
+    X_gen = np.empty([batchsize] + list(X.shape[1:]))
+    Y_gen = np.empty([batchsize] + list(Y.shape[1:]))
+    n_samples = X.shape[0]
+    while True:
+        prob = np.random.uniform(0,1)
+        ind = np.random.choice(n_samples, batchsize, replace=False)
+        X_gen = X[ind]
+        Y_gen = Y[ind]
+        
+        if prob < strength:
+              freq_cut = np.random.uniform(min_freq_cut, max_freq_cut)
+              X_gen = batch_band_pass(X_gen, 0.01, freq_cut, samplingfreq)              
+        
+        yield [ X_gen, Y_gen.toarray()]
 
         
 ## Train with custom Train_on_batch method, did not test it, may be slow

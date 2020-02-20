@@ -549,7 +549,8 @@ def My_eeg_net_1d_w_CM(nb_classes, Chans = 64, Samples = 128,
              optimizer = Adam,
              learning_rate=1e-4,
              dropoutType = 'Dropout',
-             act = 'softmax'):
+             act = 'softmax',
+             CM_shape = (19, 45) ):
     '''
     The 1d eeg net with static connectitvity matrix as extra input
     '''
@@ -564,7 +565,7 @@ def My_eeg_net_1d_w_CM(nb_classes, Chans = 64, Samples = 128,
     input1   = Input(shape = (Samples, Chans)) 
 #    input2   = Input(shape = (Chans, Chans, 1))
 #    input2   = Input(shape = (45,))
-    input2   = Input(shape = (19, 45))
+    input2   = Input(shape = CM_shape)
     
     ##################################################################
     # The 1d branch
