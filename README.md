@@ -6,11 +6,11 @@ The Dual Stream Neural Network (DSNN) is an [*end-to-end*](https://towardsdatasc
 * Automatic feature extraction via deep layer representations in deep layers
 * Very fast predictive capabilities on trained networks 
 
-Specific details on the architecture of the DSNN,  including results on publicly available [*MEG*](https://www.bbci.de/competition/iv/) (data sets 3), [*EEG*](http://epileptologie-bonn.de/cms/front_content.php?idcat=193&lang=3), and [*fNIRS*](https://figshare.com/articles/dataset/Open_access_fNIRS_dataset_for_classification_of_the_unilateral_finger-_and_foot-tapping/9783755) datasets, the implementation and results of which are discussed in detail in the authors paper:
+Specific details on the architecture, implementation and results of the DSNN, including those applied to publicly available [*MEG*](https://www.bbci.de/competition/iv/) (data sets 3), [*EEG*](http://epileptologie-bonn.de/cms/front_content.php?idcat=193&lang=3), and [*fNIRS*](https://figshare.com/articles/dataset/Open_access_fNIRS_dataset_for_classification_of_the_unilateral_finger-_and_foot-tapping/9783755) datasets are discussed in detail in the Author's paper:
 
-  [*Dual stream neural networks for brain signal classification*](https://iopscience.iop.org/article/10.1088/1741-2552/abc903/meta)  
+  [*Dual Stream Neural Networks for Brain Signal Classification*](https://iopscience.iop.org/article/10.1088/1741-2552/abc903/meta)  
 
-along with several other models for possibly improving its prediction performance within other contexts.
+along with several other models for improving the DSNN prediction performance within other contexts.
 
 ***
  
