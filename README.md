@@ -1,4 +1,8 @@
 # EEG classification
+An implementation for the paper   
+  [*Dual stream neural networks for brain signal classification*](https://iopscience.iop.org/article/10.1088/1741-2552/abc903/meta)  
+along with some other models for possibly improving the prediction performance.
+***
  
 ## Code Overview
 
