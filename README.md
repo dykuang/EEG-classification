@@ -1,6 +1,6 @@
 # Classifying Functional Neuroimaging Signals
 
-The Dual Stream Neural Network (DSNN) is an [*end-to-end*](https://towardsdatascience.com/e2e-the-every-purpose-ml-method-5d4f20dafee4) subject-independent neural network designed for classifying multi-channel functional neuroimaging signals.  Some of its salient features include:
+The Dual Stream Neural Network (DSNN) is an [*end-to-end*](https://towardsdatascience.com/e2e-the-every-purpose-ml-method-5d4f20dafee4) subject-independent neural network architecture designed for classifying multi-channel functional neuroimaging signals.  Some of its salient features include:
 
 * End-to-end prediction without spending excessive labor on handcrafting/selecting features
 * Automatic feature extraction via deep layer representations in deep layers
